@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  "plugins": [
+    "oxc",
+    "typescript",
+    "import",
+    "unicorn",
+    "jsx-a11y",
+    "promise",
+    "vitest"
+  ],
+
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "pedantic": "warn",
+    "perf": "warn"
+  },
+
+  "settings": {
+    "vitest": {
+      "typecheck": true
+    }
+  },
+
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "tauri-bindings",
+    "src/vite-env.d.ts",
+    "*.config.*"
+  ],
+
+  "rules": {},
+
+  "overrides": []
+}

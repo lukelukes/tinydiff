@@ -1,0 +1,60 @@
+{
+  "name": "tinydiff",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "imports": {
+    "#features/*": "./src/features/*",
+    "#core/*": "./src/core/*",
+    "#lib/*": "./src/lib/*",
+    "#testing/*": "./src/testing/*",
+    "#vitest-browser-solid/*": "./vitest-browser-solid/*.ts",
+    "#tauri-bindings/*": "./tauri-bindings/*.ts"
+  },
+  "scripts": {
+    "start": "vite",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "test": "vitest --run",
+    "test:watch": "bun vitest",
+    "test:unit": "bun vitest run --project unit",
+    "test:property": "bun vitest run --project property",
+    "test:browser": "bun vitest run --project browser",
+    "test:browser:headed": "HEADED=true bun vitest run --project browser",
+    "tauri": "tauri",
+    "typecheck": "tsc",
+    "lint": "oxlint --type-aware --type-check --config oxlint.json src",
+    "lint:fix": "oxlint --type-aware --type-check --config oxlint.json --fix src",
+    "lint:eslint": "eslint src/",
+    "lint:eslint:fix": "eslint --fix src/",
+    "fmt": "oxfmt --config oxfmt.json --write",
+    "fmt:check": "oxfmt --config oxfmt.json --check",
+    "upgrade-deps": "bunx npm-check-updates -i"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.9.1",
+    "@tauri-apps/plugin-opener": "2.5.2",
+    "@tauri-apps/plugin-window-state": "~2",
+    "solid-js": "1.9.10"
+  },
+  "devDependencies": {
+    "@solidjs/testing-library": "0.8.10",
+    "@tailwindcss/vite": "4.1.18",
+    "@tauri-apps/cli": "2.9.6",
+    "@types/bun": "1.3.5",
+    "@typescript-eslint/parser": "^8.51.0",
+    "@vitest/browser-webdriverio": "4.0.16",
+    "eslint": "9.39.2",
+    "eslint-plugin-solid": "0.14.5",
+    "fast-check": "4.5.3",
+    "oxfmt": "0.21.0",
+    "oxlint": "1.36.0",
+    "oxlint-tsgolint": "0.10.0",
+    "tailwindcss": "4.1.18",
+    "typescript": "5.9.3",
+    "vite": "7.3.0",
+    "vite-plugin-solid": "2.11.10",
+    "vitest": "4.0.16"
+  }
+}

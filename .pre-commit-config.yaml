@@ -1,0 +1,68 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: oxfmt
+        name: oxfmt check
+        entry: bun run fmt:check
+        language: system
+        types_or: [ts, tsx, javascript, jsx]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: oxlint
+        name: oxlint
+        entry: bun run lint
+        language: system
+        types_or: [ts, tsx, javascript, jsx]
+        pass_filenames: false
+        stages: [pre-commit]
+
+      - id: eslint-solidjs
+        name: ESLint + autofix
+        entry: bunx eslint --fix
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: true
+        stages: [pre-commit]
+
+      - id: cargo-test
+        name: cargo test
+        entry: cargo test --manifest-path src-tauri/Cargo.toml
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: frontend-test
+        name: bun run test
+        entry: bun run test
+        language: system
+        types_or: [ts, tsx]
+        pass_filenames: false
+        stages: [pre-push]

@@ -2,4 +2,6 @@ node_modules/
 dist/
 build/
 target/
-
+tsconfig.tsbuildinfo
+tsconfig.node.tsbuildinfo
+.idea/

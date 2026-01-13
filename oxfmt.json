@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+
+  "singleQuote": true,
+  "trailingComma": "none",
+
+  "experimentalSortImports": {
+    "sortOrder": "source"
+  },
+
+  "experimentalSortPackageJson": true,
+
+  "ignorePatterns": ["dist", "node_modules", "tauri-bindings"]
+}

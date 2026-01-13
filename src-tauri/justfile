@@ -1,0 +1,31 @@
+fmt:
+    cargo fmt
+
+fmt-check:
+    cargo fmt -- --check
+
+clippy:
+    cargo clippy --all-targets -- -D warnings
+
+test:
+    cargo test
+
+check: fmt-check clippy test
+
+build:
+    cargo build --release
+
+run:
+    RUST_LOG=debug cargo run
+
+ci: check
+    @echo "All checks passed!"
+
+fix:
+    cargo clippy --all-targets --fix --allow-dirty
+
+clean:
+    cargo clean
+
+deny:
+    cargo deny check

@@ -1,0 +1,31 @@
+[package]
+name = "tinydiff"
+version = "0.1.0"
+description = "A tiny diff viewer"
+authors = ["you"]
+edition = "2024"
+rust-version = "1.92.0"
+
+[lib]
+name = "tinydiff_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.3", features = [] }
+
+[dependencies]
+tauri = { version = "2.9.5", features = [] }
+tauri-plugin-opener = "2.5.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.148"
+thiserror = "2.0.17"
+specta = { version = "=2.0.0-rc.22", features = ["derive"] }
+tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }
+specta-typescript = "0.0.9"
+
+[dev-dependencies]
+tempfile = "3.24.0"
+proptest = "1.9.0"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-window-state = "2"
