@@ -31,6 +31,7 @@
     "knip": "knip"
   },
   "dependencies": {
+    "@pierre/diffs": "1.0.5",
     "@tauri-apps/api": "2.9.1",
     "@tauri-apps/plugin-opener": "2.5.3",
     "@tauri-apps/plugin-window-state": "~2",

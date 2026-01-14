@@ -3,8 +3,6 @@
   "entry": ["src/index.tsx", "vite.config.ts", "vitest.config.ts"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignore": [],
-  "ignoreDependencies": [
-    "@tauri-apps/*"
-  ],
+  "ignoreDependencies": ["@tauri-apps/*"],
   "ignoreExportsUsedInFile": true
 }

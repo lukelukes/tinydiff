@@ -6,13 +6,7 @@
     "perf": "warn",
     "suspicious": "warn"
   },
-  "ignorePatterns": [
-    "dist",
-    "node_modules",
-    "tauri-bindings",
-    "src/vite-env.d.ts",
-    "*.config.*"
-  ],
+  "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "src/vite-env.d.ts", "*.config.*"],
   "plugins": [
     "oxc",
     "typescript",
@@ -28,9 +22,7 @@
     "import/no-unassigned-import": [
       "error",
       {
-        "allow": [
-          "**/*.css"
-        ]
+        "allow": ["**/*.css"]
       }
     ],
     "max-lines-per-function": "off",
