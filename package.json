@@ -25,11 +25,10 @@
     "typecheck": "tsc",
     "lint": "oxlint --type-aware --type-check --config oxlint.json src",
     "lint:fix": "oxlint --type-aware --type-check --config oxlint.json --fix src",
-    "lint:eslint": "eslint src/",
-    "lint:eslint:fix": "eslint --fix src/",
     "fmt": "oxfmt --config oxfmt.json --write",
     "fmt:check": "oxfmt --config oxfmt.json --check",
-    "upgrade-deps": "bunx npm-check-updates -i"
+    "upgrade-deps": "bunx npm-check-updates -i",
+    "knip": "knip"
   },
   "dependencies": {
     "@tauri-apps/api": "2.9.1",
@@ -48,6 +47,7 @@
     "@vitest/browser-webdriverio": "4.0.17",
     "eslint": "9.39.2",
     "fast-check": "4.5.3",
+    "knip": "5.81.0",
     "oxfmt": "0.24.0",
     "oxlint": "1.39.0",
     "oxlint-tsgolint": "0.11.0",
