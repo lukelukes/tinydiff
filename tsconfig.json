@@ -11,8 +11,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js",
+    "jsx": "react-jsx",
 
     "strict": true,
     "noUncheckedIndexedAccess": true,
@@ -28,7 +27,6 @@
       "#core/*": ["./src/core/*"],
       "#lib/*": ["./src/lib/*"],
       "#testing/*": ["./src/testing/*"],
-      "#vitest-browser-solid": ["./vitest-browser-solid/*"],
       "#tauri-bindings": ["./tauri-bindings/*"]
     }
   },

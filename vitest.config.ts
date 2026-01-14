@@ -1,5 +1,5 @@
+import react from '@vitejs/plugin-react';
 import { webdriverio } from '@vitest/browser-webdriverio';
-import solid from 'vite-plugin-solid';
 import { defineConfig } from 'vitest/config';
 
 const headed = process.env.HEADED === 'true';
@@ -27,7 +27,7 @@ export default defineConfig({
         }
       },
       {
-        plugins: [solid()],
+        plugins: [react()],
         test: {
           name: 'browser',
           browser: {
@@ -37,7 +37,6 @@ export default defineConfig({
             instances: [{ browser: 'chrome' }]
           },
           environment: 'node',
-          setupFiles: ['./vitest-browser-solid/index.ts', './src/testing/setup.ts'],
           include: ['src/**/*.browser.{test,spec}.{ts,tsx}']
         }
       }

@@ -1,6 +1,10 @@
-/* @refresh reload */
-import { render } from 'solid-js/web';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 
 import App from './app.tsx';
 
-render(() => <App />, document.querySelector('#root') as HTMLElement);
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);

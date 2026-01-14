@@ -1,29 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-
-  "plugins": [
-    "oxc",
-    "typescript",
-    "import",
-    "unicorn",
-    "jsx-a11y",
-    "promise",
-    "vitest"
-  ],
-
   "categories": {
     "correctness": "error",
-    "suspicious": "warn",
     "pedantic": "warn",
-    "perf": "warn"
+    "perf": "warn",
+    "suspicious": "warn"
   },
-
-  "settings": {
-    "vitest": {
-      "typecheck": true
-    }
-  },
-
   "ignorePatterns": [
     "dist",
     "node_modules",
@@ -31,8 +13,37 @@
     "src/vite-env.d.ts",
     "*.config.*"
   ],
-
-  "rules": {},
-
-  "overrides": []
+  "plugins": [
+    "oxc",
+    "typescript",
+    "react",
+    "react-perf",
+    "import",
+    "unicorn",
+    "jsx-a11y",
+    "promise",
+    "vitest"
+  ],
+  "rules": {
+    "import/no-unassigned-import": [
+      "error",
+      {
+        "allow": [
+          "**/*.css"
+        ]
+      }
+    ],
+    "max-lines-per-function": "off",
+    "react/react-in-jsx-scope": "off",
+    "unicorn/prefer-query-selector": "off",
+    "no-warning-comments": "off"
+  },
+  "settings": {
+    "react": {
+      "version": "19"
+    },
+    "vitest": {
+      "typecheck": true
+    }
+  }
 }
