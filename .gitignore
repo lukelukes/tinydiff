@@ -5,3 +5,6 @@ target/
 tsconfig.tsbuildinfo
 tsconfig.node.tsbuildinfo
 .idea/
+.claude/
+.opencode/
+
