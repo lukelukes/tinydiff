@@ -7,6 +7,12 @@ pub fn open_repository(path: &Path) -> Result<Repository, git2::Error> {
     Repository::open(path)
 }
 
+/// Discovers a git repository at or above the given path.
+/// This walks up the directory tree to find a .git directory.
+pub fn discover_repository(path: &Path) -> Result<Repository, git2::Error> {
+    Repository::discover(path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,7 +3,7 @@
   "productName": "tinydiff",
   "version": "0.1.0",
   "identifier": "com.lukelukes.tinydiff",
-  "build": {
+    "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build",

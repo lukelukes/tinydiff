@@ -1,5 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    tinydiff_lib::run()
+    tinydiff_lib::run();
 }
