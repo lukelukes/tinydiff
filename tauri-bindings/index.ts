@@ -31,6 +31,14 @@ async getGitFileContents(repoPath: string, filePath: string, target: DiffTarget)
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async readFile(filePath: string) : Promise<Result<ReadFileResult, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("read_file", { filePath }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -81,6 +89,10 @@ export type GitStatus = { staged: FileEntry[]; unstaged: FileEntry[]; untracked:
  * Type of change for a diff line
  */
 export type LineChangeType = "context" | "addition" | "deletion"
+/**
+ * Result of reading a file from the filesystem
+ */
+export type ReadFileResult = { name: string; contents: string; lang: string | null; isBinary: boolean }
 
 /** tauri-specta globals **/
 

@@ -1,6 +1,8 @@
+pub mod fs;
 pub mod git;
 
-use clap::{error::ErrorKind, CommandFactory, Parser};
+use clap::{CommandFactory, Parser, error::ErrorKind};
+use fs::ReadFileResult;
 use git::{DiffTarget, FileDiff, GitFileContents, GitStatus};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -214,6 +216,40 @@ fn get_git_file_contents(
     })
 }
 
+#[tauri::command]
+#[specta::specta]
+fn read_file(
+    file_path: String,
+    state: tauri::State<'_, AppMode>,
+) -> Result<ReadFileResult, CommandError> {
+    // Validate that the requested path is one of the allowed paths from AppMode::File
+    let (allowed_a, allowed_b) = match state.inner() {
+        AppMode::File { file_a, file_b } => (file_a.as_str(), file_b.as_str()),
+        _ => {
+            return Err(CommandError::Path {
+                path: file_path,
+                message: "read_file is only available in file comparison mode".to_string(),
+            });
+        }
+    };
+
+    if file_path != allowed_a && file_path != allowed_b {
+        return Err(CommandError::Path {
+            path: file_path,
+            message: "Access denied: path not in allowed file list".to_string(),
+        });
+    }
+
+    let path_buf = PathBuf::from(&file_path);
+
+    fs::read_file(&path_buf).map_err(|source| {
+        CommandError::from(AppError::PathError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_mode = parse_app_mode().unwrap_or_else(|e| {
@@ -226,12 +262,13 @@ pub fn run() {
         Args::command().error(kind, e).exit()
     });
 
-    let builder = tauri_specta::Builder::<tauri::Wry>::new()
-        .commands(tauri_specta::collect_commands![
+    let builder =
+        tauri_specta::Builder::<tauri::Wry>::new().commands(tauri_specta::collect_commands![
             get_app_mode,
             get_git_status,
             get_file_diff,
-            get_git_file_contents
+            get_git_file_contents,
+            read_file
         ]);
 
     #[cfg(debug_assertions)]

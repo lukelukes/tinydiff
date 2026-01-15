@@ -1,7 +1,7 @@
+use crate::fs::extension_to_lang;
 use git2::{DiffLineType, DiffOptions, Repository, Status, StatusOptions};
 use serde::{Deserialize, Serialize};
 use specta::Type;
-use std::ffi::OsStr;
 use std::path::Path;
 
 /// Opens a git repository at the given path.
@@ -143,96 +143,6 @@ pub struct GitFileContents {
     pub is_binary: bool,
 }
 
-/// Map file extension to Shiki language identifier
-fn extension_to_lang(path: &str) -> Option<String> {
-    let file_path = Path::new(path);
-
-    // First check filename for extensionless files and dotfiles
-    if let Some(filename) = file_path.file_name().and_then(|f| f.to_str()) {
-        let lang = match filename.to_lowercase().as_str() {
-            "makefile" | "gnumakefile" => Some("makefile"),
-            "dockerfile" => Some("dockerfile"),
-            ".gitignore" | ".dockerignore" => Some("ignore"),
-            ".env" | ".env.local" | ".env.example" => Some("properties"),
-            _ => None,
-        };
-        if lang.is_some() {
-            return lang.map(String::from);
-        }
-    }
-
-    // Then check extension
-    let ext = file_path
-        .extension()
-        .and_then(OsStr::to_str)?
-        .to_lowercase();
-
-    let lang = match ext.as_str() {
-        // Web
-        "js" | "mjs" | "cjs" => "javascript",
-        "ts" | "mts" | "cts" => "typescript",
-        "tsx" => "tsx",
-        "jsx" => "jsx",
-        "html" | "htm" => "html",
-        "css" => "css",
-        "scss" => "scss",
-        "less" => "less",
-        "json" => "json",
-        "jsonc" => "jsonc",
-        "xml" => "xml",
-        "svg" => "xml",
-        "yaml" | "yml" => "yaml",
-        "toml" => "toml",
-        // Systems
-        "rs" => "rust",
-        "go" => "go",
-        "c" | "h" => "c",
-        "cpp" | "cc" | "cxx" | "hpp" | "hxx" => "cpp",
-        "zig" => "zig",
-        // Scripting
-        "py" => "python",
-        "rb" => "ruby",
-        "php" => "php",
-        "lua" => "lua",
-        "sh" | "bash" | "zsh" => "bash",
-        "fish" => "fish",
-        "ps1" | "psm1" => "powershell",
-        // JVM
-        "java" => "java",
-        "kt" | "kts" => "kotlin",
-        "scala" | "sc" => "scala",
-        "groovy" | "gradle" => "groovy",
-        // Other
-        "sql" => "sql",
-        "md" | "markdown" => "markdown",
-        "dockerfile" => "dockerfile",
-        "makefile" | "mk" => "makefile",
-        "graphql" | "gql" => "graphql",
-        "vue" => "vue",
-        "svelte" => "svelte",
-        "astro" => "astro",
-        "swift" => "swift",
-        "r" => "r",
-        "dart" => "dart",
-        "ex" | "exs" => "elixir",
-        "erl" | "hrl" => "erlang",
-        "hs" | "lhs" => "haskell",
-        "ml" | "mli" => "ocaml",
-        "clj" | "cljs" | "cljc" | "edn" => "clojure",
-        "lisp" | "cl" | "el" => "lisp",
-        "nim" => "nim",
-        "v" => "v",
-        "tf" | "tfvars" => "hcl",
-        "nix" => "nix",
-        "proto" => "protobuf",
-        "prisma" => "prisma",
-        "sol" => "solidity",
-        _ => return None,
-    };
-
-    Some(lang.to_string())
-}
-
 /// Get old and new file contents for diff rendering.
 /// For staged: old from HEAD, new from index.
 /// For unstaged: old from index, new from workdir.
@@ -249,9 +159,9 @@ pub fn get_git_file_contents(
 
     // For unstaged diffs, validate that the resolved path stays within the workdir
     if target == DiffTarget::Unstaged {
-        let workdir = repo.workdir().ok_or_else(|| {
-            git2::Error::from_str("Repository has no working directory")
-        })?;
+        let workdir = repo
+            .workdir()
+            .ok_or_else(|| git2::Error::from_str("Repository has no working directory"))?;
         let full_path = workdir.join(file_path);
         // Canonicalize both paths and verify the file path is within workdir
         // Note: canonicalize requires the path to exist, so we canonicalize parent for new files
@@ -263,16 +173,18 @@ pub fn get_git_file_contents(
             full_path.canonicalize()
         } else {
             // For non-existent files (e.g., deleted), canonicalize parent and append filename
-            full_path.parent()
+            full_path
+                .parent()
                 .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "No parent"))
                 .and_then(|p| p.canonicalize())
                 .map(|p| p.join(full_path.file_name().unwrap_or_default()))
-        }.map_err(|e| {
-            git2::Error::from_str(&format!("Failed to canonicalize path: {}", e))
-        })?;
+        }
+        .map_err(|e| git2::Error::from_str(&format!("Failed to canonicalize path: {}", e)))?;
 
         if !canonical_full.starts_with(&canonical_workdir) {
-            return Err(git2::Error::from_str("Path traversal detected: path escapes repository"));
+            return Err(git2::Error::from_str(
+                "Path traversal detected: path escapes repository",
+            ));
         }
     }
 
@@ -325,16 +237,21 @@ pub fn get_git_file_contents(
 
             // New: content from working directory
             // Note: workdir was already validated above during path traversal check
-            let workdir = repo.workdir().ok_or_else(|| {
-                git2::Error::from_str("Repository has no working directory")
-            })?;
+            let workdir = repo
+                .workdir()
+                .ok_or_else(|| git2::Error::from_str("Repository has no working directory"))?;
             let full_path = workdir.join(file_path);
             // Read file directly, handling NotFound as empty (deleted file)
             // This avoids TOCTOU race condition from exists() + read() pattern
             let workdir_content = match std::fs::read(&full_path) {
                 Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
-                Err(e) => return Err(git2::Error::from_str(&format!("Failed to read file: {}", e))),
+                Err(e) => {
+                    return Err(git2::Error::from_str(&format!(
+                        "Failed to read file: {}",
+                        e
+                    )));
+                }
             };
 
             let (old, is_binary_old) = blob_to_string(index_blob);
@@ -378,12 +295,10 @@ pub fn get_file_diff(
     opts.context_lines(5);
 
     let diff = match target {
-        DiffTarget::Staged => {
-            match repo.head().ok().and_then(|h| h.peel_to_tree().ok()) {
-                Some(head) => repo.diff_tree_to_index(Some(&head), None, Some(&mut opts))?,
-                None => repo.diff_tree_to_index(None, None, Some(&mut opts))?
-            }
-        }
+        DiffTarget::Staged => match repo.head().ok().and_then(|h| h.peel_to_tree().ok()) {
+            Some(head) => repo.diff_tree_to_index(Some(&head), None, Some(&mut opts))?,
+            None => repo.diff_tree_to_index(None, None, Some(&mut opts))?,
+        },
         DiffTarget::Unstaged => {
             // For unstaged changes: diff index to workdir
             repo.diff_index_to_workdir(None, Some(&mut opts))?
@@ -844,9 +759,7 @@ mod tests {
             .find_branch("feature", git2::BranchType::Local)
             .unwrap();
         let feature_commit = feature_branch.get().peel_to_commit().unwrap();
-        let annotated_commit = repo
-            .find_annotated_commit(feature_commit.id())
-            .unwrap();
+        let annotated_commit = repo.find_annotated_commit(feature_commit.id()).unwrap();
 
         // Perform the merge (this will leave the repo in a conflicted state)
         repo.merge(&[&annotated_commit], None, None).unwrap();
@@ -892,10 +805,11 @@ mod tests {
         assert_eq!(hunk.old_start, 0);
         assert_eq!(hunk.new_start, 1);
         assert_eq!(hunk.lines.len(), 3);
-        assert!(hunk
-            .lines
-            .iter()
-            .all(|l| l.change_type == LineChangeType::Addition));
+        assert!(
+            hunk.lines
+                .iter()
+                .all(|l| l.change_type == LineChangeType::Addition)
+        );
     }
 
     #[test]
@@ -1032,38 +946,6 @@ mod tests {
         // With 20 lines and changes at 1 and 20, and 5 lines of context,
         // we should get 2 separate hunks (lines 1-6 and lines 15-20)
         assert_eq!(diff.hunks.len(), 2, "Expected 2 hunks for distant changes");
-    }
-
-    #[test]
-    fn test_extension_to_lang() {
-        // Standard extensions
-        assert_eq!(extension_to_lang("file.rs"), Some("rust".to_string()));
-        assert_eq!(extension_to_lang("file.ts"), Some("typescript".to_string()));
-        assert_eq!(extension_to_lang("file.tsx"), Some("tsx".to_string()));
-        assert_eq!(extension_to_lang("file.py"), Some("python".to_string()));
-        assert_eq!(extension_to_lang("file.go"), Some("go".to_string()));
-        assert_eq!(extension_to_lang("file.unknown"), None);
-        assert_eq!(extension_to_lang("noextension"), None);
-        assert_eq!(extension_to_lang("path/to/file.js"), Some("javascript".to_string()));
-
-        // New extensions: proto, prisma, solidity
-        assert_eq!(extension_to_lang("schema.proto"), Some("protobuf".to_string()));
-        assert_eq!(extension_to_lang("schema.prisma"), Some("prisma".to_string()));
-        assert_eq!(extension_to_lang("contract.sol"), Some("solidity".to_string()));
-
-        // Extensionless files
-        assert_eq!(extension_to_lang("Makefile"), Some("makefile".to_string()));
-        assert_eq!(extension_to_lang("GNUmakefile"), Some("makefile".to_string()));
-        assert_eq!(extension_to_lang("Dockerfile"), Some("dockerfile".to_string()));
-        assert_eq!(extension_to_lang("path/to/Makefile"), Some("makefile".to_string()));
-
-        // Dotfiles
-        assert_eq!(extension_to_lang(".gitignore"), Some("ignore".to_string()));
-        assert_eq!(extension_to_lang(".dockerignore"), Some("ignore".to_string()));
-        assert_eq!(extension_to_lang(".env"), Some("properties".to_string()));
-        assert_eq!(extension_to_lang(".env.local"), Some("properties".to_string()));
-        assert_eq!(extension_to_lang(".env.example"), Some("properties".to_string()));
-        assert_eq!(extension_to_lang("path/to/.gitignore"), Some("ignore".to_string()));
     }
 
     #[test]
