@@ -1,6 +1,7 @@
 pub mod git;
 
 use clap::{error::ErrorKind, CommandFactory, Parser};
+use git::GitStatus;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::path::{Path, PathBuf};
@@ -55,6 +56,41 @@ pub enum AppError {
     InvalidArgCount(usize),
 }
 
+/// Serializable error type for Tauri commands.
+/// Converts AppError variants to a format that can cross the IPC boundary.
+#[derive(Debug, Clone, Serialize, Type)]
+#[serde(tag = "type")]
+pub enum CommandError {
+    #[serde(rename = "path")]
+    Path { path: String, message: String },
+    #[serde(rename = "utf8")]
+    InvalidUtf8 { path: String },
+    #[serde(rename = "git")]
+    Git { path: String, message: String },
+}
+
+impl From<AppError> for CommandError {
+    fn from(err: AppError) -> Self {
+        match err {
+            AppError::PathError { path, source } => CommandError::Path {
+                path: path.display().to_string(),
+                message: source.to_string(),
+            },
+            AppError::InvalidUtf8(path) => CommandError::InvalidUtf8 {
+                path: path.display().to_string(),
+            },
+            AppError::GitError { path, source } => CommandError::Git {
+                path: path.display().to_string(),
+                message: source.to_string(),
+            },
+            AppError::InvalidArgCount { .. } => CommandError::Path {
+                path: String::new(),
+                message: "Invalid argument count".to_string(),
+            },
+        }
+    }
+}
+
 fn canonicalize_path(path: PathBuf) -> Result<PathBuf, AppError> {
     std::fs::canonicalize(&path).map_err(|source| AppError::PathError { path, source })
 }
@@ -105,6 +141,24 @@ fn get_app_mode(state: tauri::State<'_, AppMode>) -> AppMode {
     state.inner().clone()
 }
 
+#[tauri::command]
+#[specta::specta]
+fn get_git_status(path: String) -> Result<GitStatus, CommandError> {
+    let path_buf = PathBuf::from(&path);
+    let repo = git::discover_repository(&path_buf).map_err(|source| {
+        CommandError::from(AppError::GitError {
+            path: path_buf.clone(),
+            source,
+        })
+    })?;
+    git::get_status(&repo).map_err(|source| {
+        CommandError::from(AppError::GitError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_mode = parse_app_mode().unwrap_or_else(|e| {
@@ -118,7 +172,7 @@ pub fn run() {
     });
 
     let builder = tauri_specta::Builder::<tauri::Wry>::new()
-        .commands(tauri_specta::collect_commands![get_app_mode]);
+        .commands(tauri_specta::collect_commands![get_app_mode, get_git_status]);
 
     #[cfg(debug_assertions)]
     builder

@@ -5,7 +5,17 @@
 
 
 export const commands = {
-
+async getAppMode() : Promise<AppMode> {
+    return await TAURI_INVOKE("get_app_mode");
+},
+async getGitStatus(path: string) : Promise<Result<GitStatus, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_status", { path }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+}
 }
 
 /** user-defined events **/
@@ -18,7 +28,15 @@ export const commands = {
 
 /** user-defined types **/
 
-
+export type AppMode = { type: "empty" } | { type: "git"; path: string } | { type: "file"; fileA: string; fileB: string }
+/**
+ * Serializable error type for Tauri commands.
+ * Converts AppError variants to a format that can cross the IPC boundary.
+ */
+export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; path: string; message: string }
+export type FileEntry = { path: string; status: FileStatus; oldPath: string | null }
+export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "untracked" | "typechange" | "conflicted"
+export type GitStatus = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] }
 
 /** tauri-specta globals **/
 
