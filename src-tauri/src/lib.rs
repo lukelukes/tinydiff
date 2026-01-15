@@ -1,7 +1,7 @@
 pub mod git;
 
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use git::{DiffTarget, FileDiff, GitStatus};
+use git::{DiffTarget, FileDiff, GitFileContents, GitStatus};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::path::{Path, PathBuf};
@@ -190,6 +190,30 @@ fn get_file_diff(
     })
 }
 
+#[tauri::command]
+#[specta::specta]
+fn get_git_file_contents(
+    repo_path: String,
+    file_path: String,
+    target: DiffTarget,
+) -> Result<GitFileContents, CommandError> {
+    let path_buf = PathBuf::from(&repo_path);
+    let repo = git::discover_repository(&path_buf).map_err(|source| {
+        CommandError::from(AppError::GitError {
+            path: path_buf.clone(),
+            source,
+        })
+    })?;
+
+    // Path validation is handled inside git::get_git_file_contents with proper canonicalization
+    git::get_git_file_contents(&repo, &file_path, target).map_err(|source| {
+        CommandError::from(AppError::GitError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_mode = parse_app_mode().unwrap_or_else(|e| {
@@ -206,7 +230,8 @@ pub fn run() {
         .commands(tauri_specta::collect_commands![
             get_app_mode,
             get_git_status,
-            get_file_diff
+            get_file_diff,
+            get_git_file_contents
         ]);
 
     #[cfg(debug_assertions)]

@@ -23,6 +23,14 @@ async getFileDiff(repoPath: string, filePath: string, target: DiffTarget) : Prom
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getGitFileContents(repoPath: string, filePath: string, target: DiffTarget) : Promise<Result<GitFileContents, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_git_file_contents", { repoPath, filePath, target }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -55,11 +63,19 @@ export type DiffLine = { changeType: LineChangeType; content: string; oldLineNo:
  */
 export type DiffTarget = "staged" | "unstaged"
 /**
+ * File contents for diff rendering
+ */
+export type FileContents = { name: string; contents: string; lang: string | null }
+/**
  * Complete diff for a single file
  */
 export type FileDiff = { path: string; oldPath: string | null; hunks: DiffHunk[]; isBinary: boolean }
 export type FileEntry = { path: string; status: FileStatus; oldPath: string | null }
 export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "untracked" | "typechange" | "conflicted"
+/**
+ * Result of getting file contents for diff
+ */
+export type GitFileContents = { oldFile: FileContents; newFile: FileContents; isBinary: boolean }
 export type GitStatus = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] }
 /**
  * Type of change for a diff line

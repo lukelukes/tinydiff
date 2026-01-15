@@ -1,6 +1,7 @@
 use git2::{DiffLineType, DiffOptions, Repository, Status, StatusOptions};
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::ffi::OsStr;
 use std::path::Path;
 
 /// Opens a git repository at the given path.
@@ -122,6 +123,246 @@ pub struct FileDiff {
 pub enum DiffTarget {
     Staged,
     Unstaged,
+}
+
+/// File contents for diff rendering
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct FileContents {
+    pub name: String,
+    pub contents: String,
+    pub lang: Option<String>,
+}
+
+/// Result of getting file contents for diff
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileContents {
+    pub old_file: FileContents,
+    pub new_file: FileContents,
+    pub is_binary: bool,
+}
+
+/// Map file extension to Shiki language identifier
+fn extension_to_lang(path: &str) -> Option<String> {
+    let file_path = Path::new(path);
+
+    // First check filename for extensionless files and dotfiles
+    if let Some(filename) = file_path.file_name().and_then(|f| f.to_str()) {
+        let lang = match filename.to_lowercase().as_str() {
+            "makefile" | "gnumakefile" => Some("makefile"),
+            "dockerfile" => Some("dockerfile"),
+            ".gitignore" | ".dockerignore" => Some("ignore"),
+            ".env" | ".env.local" | ".env.example" => Some("properties"),
+            _ => None,
+        };
+        if lang.is_some() {
+            return lang.map(String::from);
+        }
+    }
+
+    // Then check extension
+    let ext = file_path
+        .extension()
+        .and_then(OsStr::to_str)?
+        .to_lowercase();
+
+    let lang = match ext.as_str() {
+        // Web
+        "js" | "mjs" | "cjs" => "javascript",
+        "ts" | "mts" | "cts" => "typescript",
+        "tsx" => "tsx",
+        "jsx" => "jsx",
+        "html" | "htm" => "html",
+        "css" => "css",
+        "scss" => "scss",
+        "less" => "less",
+        "json" => "json",
+        "jsonc" => "jsonc",
+        "xml" => "xml",
+        "svg" => "xml",
+        "yaml" | "yml" => "yaml",
+        "toml" => "toml",
+        // Systems
+        "rs" => "rust",
+        "go" => "go",
+        "c" | "h" => "c",
+        "cpp" | "cc" | "cxx" | "hpp" | "hxx" => "cpp",
+        "zig" => "zig",
+        // Scripting
+        "py" => "python",
+        "rb" => "ruby",
+        "php" => "php",
+        "lua" => "lua",
+        "sh" | "bash" | "zsh" => "bash",
+        "fish" => "fish",
+        "ps1" | "psm1" => "powershell",
+        // JVM
+        "java" => "java",
+        "kt" | "kts" => "kotlin",
+        "scala" | "sc" => "scala",
+        "groovy" | "gradle" => "groovy",
+        // Other
+        "sql" => "sql",
+        "md" | "markdown" => "markdown",
+        "dockerfile" => "dockerfile",
+        "makefile" | "mk" => "makefile",
+        "graphql" | "gql" => "graphql",
+        "vue" => "vue",
+        "svelte" => "svelte",
+        "astro" => "astro",
+        "swift" => "swift",
+        "r" => "r",
+        "dart" => "dart",
+        "ex" | "exs" => "elixir",
+        "erl" | "hrl" => "erlang",
+        "hs" | "lhs" => "haskell",
+        "ml" | "mli" => "ocaml",
+        "clj" | "cljs" | "cljc" | "edn" => "clojure",
+        "lisp" | "cl" | "el" => "lisp",
+        "nim" => "nim",
+        "v" => "v",
+        "tf" | "tfvars" => "hcl",
+        "nix" => "nix",
+        "proto" => "protobuf",
+        "prisma" => "prisma",
+        "sol" => "solidity",
+        _ => return None,
+    };
+
+    Some(lang.to_string())
+}
+
+/// Get old and new file contents for diff rendering.
+/// For staged: old from HEAD, new from index.
+/// For unstaged: old from index, new from workdir.
+pub fn get_git_file_contents(
+    repo: &Repository,
+    file_path: &str,
+    target: DiffTarget,
+) -> Result<GitFileContents, git2::Error> {
+    // Validate file_path to prevent path traversal attacks
+    let file_path_obj = Path::new(file_path);
+    if file_path_obj.is_absolute() {
+        return Err(git2::Error::from_str("Absolute paths are not allowed"));
+    }
+
+    // For unstaged diffs, validate that the resolved path stays within the workdir
+    if target == DiffTarget::Unstaged {
+        let workdir = repo.workdir().ok_or_else(|| {
+            git2::Error::from_str("Repository has no working directory")
+        })?;
+        let full_path = workdir.join(file_path);
+        // Canonicalize both paths and verify the file path is within workdir
+        // Note: canonicalize requires the path to exist, so we canonicalize parent for new files
+        let canonical_workdir = workdir.canonicalize().map_err(|e| {
+            git2::Error::from_str(&format!("Failed to canonicalize workdir: {}", e))
+        })?;
+        // Try to canonicalize the full path, or its parent if file doesn't exist
+        let canonical_full = if full_path.exists() {
+            full_path.canonicalize()
+        } else {
+            // For non-existent files (e.g., deleted), canonicalize parent and append filename
+            full_path.parent()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "No parent"))
+                .and_then(|p| p.canonicalize())
+                .map(|p| p.join(full_path.file_name().unwrap_or_default()))
+        }.map_err(|e| {
+            git2::Error::from_str(&format!("Failed to canonicalize path: {}", e))
+        })?;
+
+        if !canonical_full.starts_with(&canonical_workdir) {
+            return Err(git2::Error::from_str("Path traversal detected: path escapes repository"));
+        }
+    }
+
+    let lang = extension_to_lang(file_path);
+
+    // Get the blob content as a string, returning empty string for None (new/deleted files)
+    // Uses null byte check for binary detection (consistent with workdir file handling)
+    fn blob_to_string(blob: Option<git2::Blob>) -> (String, bool) {
+        match blob {
+            Some(b) => {
+                let content = b.content();
+                let is_binary = content.contains(&0);
+                if is_binary {
+                    (String::new(), true)
+                } else {
+                    (String::from_utf8_lossy(content).into_owned(), false)
+                }
+            }
+            None => (String::new(), false),
+        }
+    }
+
+    let (old_content, new_content, is_binary) = match target {
+        DiffTarget::Staged => {
+            // Old: content from HEAD commit
+            let head_blob = repo
+                .head()
+                .ok()
+                .and_then(|h| h.peel_to_tree().ok())
+                .and_then(|tree| tree.get_path(Path::new(file_path)).ok())
+                .and_then(|entry| entry.to_object(repo).ok())
+                .and_then(|obj| obj.into_blob().ok());
+
+            // New: content from index
+            let index = repo.index()?;
+            let index_blob = index
+                .get_path(Path::new(file_path), 0)
+                .and_then(|entry| repo.find_blob(entry.id).ok());
+
+            let (old, is_binary_old) = blob_to_string(head_blob);
+            let (new, is_binary_new) = blob_to_string(index_blob);
+            (old, new, is_binary_old || is_binary_new)
+        }
+        DiffTarget::Unstaged => {
+            // Old: content from index
+            let index = repo.index()?;
+            let index_blob = index
+                .get_path(Path::new(file_path), 0)
+                .and_then(|entry| repo.find_blob(entry.id).ok());
+
+            // New: content from working directory
+            // Note: workdir was already validated above during path traversal check
+            let workdir = repo.workdir().ok_or_else(|| {
+                git2::Error::from_str("Repository has no working directory")
+            })?;
+            let full_path = workdir.join(file_path);
+            // Read file directly, handling NotFound as empty (deleted file)
+            // This avoids TOCTOU race condition from exists() + read() pattern
+            let workdir_content = match std::fs::read(&full_path) {
+                Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+                Err(e) => return Err(git2::Error::from_str(&format!("Failed to read file: {}", e))),
+            };
+
+            let (old, is_binary_old) = blob_to_string(index_blob);
+            // Check if workdir content is binary (contains null bytes)
+            let is_binary_new = workdir_content.contains('\0');
+            let new = if is_binary_new {
+                String::new()
+            } else {
+                workdir_content
+            };
+
+            (old, new, is_binary_old || is_binary_new)
+        }
+    };
+
+    Ok(GitFileContents {
+        old_file: FileContents {
+            name: file_path.to_string(),
+            contents: old_content,
+            lang: lang.clone(),
+        },
+        new_file: FileContents {
+            name: file_path.to_string(),
+            contents: new_content,
+            lang,
+        },
+        is_binary,
+    })
 }
 
 /// Get the diff for a specific file
@@ -791,5 +1032,148 @@ mod tests {
         // With 20 lines and changes at 1 and 20, and 5 lines of context,
         // we should get 2 separate hunks (lines 1-6 and lines 15-20)
         assert_eq!(diff.hunks.len(), 2, "Expected 2 hunks for distant changes");
+    }
+
+    #[test]
+    fn test_extension_to_lang() {
+        // Standard extensions
+        assert_eq!(extension_to_lang("file.rs"), Some("rust".to_string()));
+        assert_eq!(extension_to_lang("file.ts"), Some("typescript".to_string()));
+        assert_eq!(extension_to_lang("file.tsx"), Some("tsx".to_string()));
+        assert_eq!(extension_to_lang("file.py"), Some("python".to_string()));
+        assert_eq!(extension_to_lang("file.go"), Some("go".to_string()));
+        assert_eq!(extension_to_lang("file.unknown"), None);
+        assert_eq!(extension_to_lang("noextension"), None);
+        assert_eq!(extension_to_lang("path/to/file.js"), Some("javascript".to_string()));
+
+        // New extensions: proto, prisma, solidity
+        assert_eq!(extension_to_lang("schema.proto"), Some("protobuf".to_string()));
+        assert_eq!(extension_to_lang("schema.prisma"), Some("prisma".to_string()));
+        assert_eq!(extension_to_lang("contract.sol"), Some("solidity".to_string()));
+
+        // Extensionless files
+        assert_eq!(extension_to_lang("Makefile"), Some("makefile".to_string()));
+        assert_eq!(extension_to_lang("GNUmakefile"), Some("makefile".to_string()));
+        assert_eq!(extension_to_lang("Dockerfile"), Some("dockerfile".to_string()));
+        assert_eq!(extension_to_lang("path/to/Makefile"), Some("makefile".to_string()));
+
+        // Dotfiles
+        assert_eq!(extension_to_lang(".gitignore"), Some("ignore".to_string()));
+        assert_eq!(extension_to_lang(".dockerignore"), Some("ignore".to_string()));
+        assert_eq!(extension_to_lang(".env"), Some("properties".to_string()));
+        assert_eq!(extension_to_lang(".env.local"), Some("properties".to_string()));
+        assert_eq!(extension_to_lang(".env.example"), Some("properties".to_string()));
+        assert_eq!(extension_to_lang("path/to/.gitignore"), Some("ignore".to_string()));
+    }
+
+    #[test]
+    fn test_get_git_file_contents_staged_new_file() {
+        let (temp_dir, repo) = create_test_repo();
+
+        // Create initial commit to establish HEAD
+        commit_file(&repo, "existing.txt", "existing", "Initial commit");
+
+        // Stage a new file
+        let new_content = "line 1\nline 2\nline 3\n";
+        fs::write(temp_dir.path().join("new.ts"), new_content).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("new.ts")).unwrap();
+        index.write().unwrap();
+
+        let contents = get_git_file_contents(&repo, "new.ts", DiffTarget::Staged).unwrap();
+
+        // Old content should be empty (new file)
+        assert!(contents.old_file.contents.is_empty());
+        assert_eq!(contents.new_file.contents, new_content);
+        assert_eq!(contents.old_file.lang, Some("typescript".to_string()));
+        assert_eq!(contents.new_file.lang, Some("typescript".to_string()));
+        assert!(!contents.is_binary);
+    }
+
+    #[test]
+    fn test_get_git_file_contents_staged_modified_file() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        // Create initial commit
+        let original = "line 1\nline 2\nline 3\n";
+        commit_file(&repo, "file.rs", original, "Initial");
+
+        // Modify and stage
+        let modified = "line 1\nMODIFIED\nline 3\n";
+        let repo_path = repo.workdir().unwrap();
+        fs::write(repo_path.join("file.rs"), modified).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("file.rs")).unwrap();
+        index.write().unwrap();
+
+        let contents = get_git_file_contents(&repo, "file.rs", DiffTarget::Staged).unwrap();
+
+        assert_eq!(contents.old_file.contents, original);
+        assert_eq!(contents.new_file.contents, modified);
+        assert_eq!(contents.old_file.lang, Some("rust".to_string()));
+        assert!(!contents.is_binary);
+    }
+
+    #[test]
+    fn test_get_git_file_contents_unstaged_modified_file() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        // Create initial commit
+        let original = "line 1\nline 2\nline 3\n";
+        commit_file(&repo, "file.py", original, "Initial");
+
+        // Modify without staging
+        let modified = "line 1\nCHANGED\nline 3\n";
+        let repo_path = repo.workdir().unwrap();
+        fs::write(repo_path.join("file.py"), modified).unwrap();
+
+        let contents = get_git_file_contents(&repo, "file.py", DiffTarget::Unstaged).unwrap();
+
+        // For unstaged: old is from index (same as HEAD after commit), new is from workdir
+        assert_eq!(contents.old_file.contents, original);
+        assert_eq!(contents.new_file.contents, modified);
+        assert_eq!(contents.old_file.lang, Some("python".to_string()));
+        assert!(!contents.is_binary);
+    }
+
+    #[test]
+    fn test_get_git_file_contents_deleted_file() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        // Create initial commit
+        let original = "content\n";
+        commit_file(&repo, "file.txt", original, "Initial");
+
+        // Delete the file from working tree (unstaged delete)
+        let repo_path = repo.workdir().unwrap();
+        fs::remove_file(repo_path.join("file.txt")).unwrap();
+
+        let contents = get_git_file_contents(&repo, "file.txt", DiffTarget::Unstaged).unwrap();
+
+        assert_eq!(contents.old_file.contents, original);
+        assert!(contents.new_file.contents.is_empty()); // File deleted
+        assert!(!contents.is_binary);
+    }
+
+    #[test]
+    fn test_get_git_file_contents_staged_deleted_file() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        // Create initial commit
+        let original = "content\n";
+        commit_file(&repo, "file.txt", original, "Initial");
+
+        // Delete and stage
+        let repo_path = repo.workdir().unwrap();
+        fs::remove_file(repo_path.join("file.txt")).unwrap();
+        let mut index = repo.index().unwrap();
+        index.remove_path(Path::new("file.txt")).unwrap();
+        index.write().unwrap();
+
+        let contents = get_git_file_contents(&repo, "file.txt", DiffTarget::Staged).unwrap();
+
+        assert_eq!(contents.old_file.contents, original);
+        assert!(contents.new_file.contents.is_empty()); // Not in index anymore
+        assert!(!contents.is_binary);
     }
 }
