@@ -18,7 +18,6 @@
     "noImplicitOverride": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "exactOptionalPropertyTypes": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
 

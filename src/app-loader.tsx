@@ -1,8 +1,8 @@
-import { Component, useEffect, useState } from 'react';
+import type { AppMode } from '#core/app-mode';
 import type { ErrorInfo, ReactNode } from 'react';
 
-import type { AppMode } from '#core/app-mode';
 import { getAppMode } from '#core/app-mode';
+import { Component, useEffect, useState } from 'react';
 
 import App from './app.tsx';
 import { ErrorDisplay } from './components/error-display.tsx';
