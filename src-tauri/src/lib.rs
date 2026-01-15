@@ -1,3 +1,5 @@
+pub mod git;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder =
