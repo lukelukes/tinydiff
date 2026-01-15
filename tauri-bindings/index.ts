@@ -15,6 +15,14 @@ async getGitStatus(path: string) : Promise<Result<GitStatus, CommandError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getFileDiff(repoPath: string, filePath: string, target: DiffTarget) : Promise<Result<FileDiff, CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_file_diff", { repoPath, filePath, target }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -34,9 +42,29 @@ export type AppMode = { type: "empty" } | { type: "git"; path: string } | { type
  * Converts AppError variants to a format that can cross the IPC boundary.
  */
 export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; path: string; message: string }
+/**
+ * A hunk (section) of a diff
+ */
+export type DiffHunk = { oldStart: number; oldLines: number; newStart: number; newLines: number; header: string; lines: DiffLine[] }
+/**
+ * A single line in a diff
+ */
+export type DiffLine = { changeType: LineChangeType; content: string; oldLineNo: number | null; newLineNo: number | null }
+/**
+ * Whether to get staged or unstaged changes
+ */
+export type DiffTarget = "staged" | "unstaged"
+/**
+ * Complete diff for a single file
+ */
+export type FileDiff = { path: string; oldPath: string | null; hunks: DiffHunk[]; isBinary: boolean }
 export type FileEntry = { path: string; status: FileStatus; oldPath: string | null }
 export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "untracked" | "typechange" | "conflicted"
 export type GitStatus = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] }
+/**
+ * Type of change for a diff line
+ */
+export type LineChangeType = "context" | "addition" | "deletion"
 
 /** tauri-specta globals **/
 

@@ -1,7 +1,7 @@
 pub mod git;
 
 use clap::{error::ErrorKind, CommandFactory, Parser};
-use git::GitStatus;
+use git::{DiffTarget, FileDiff, GitStatus};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::path::{Path, PathBuf};
@@ -159,6 +159,37 @@ fn get_git_status(path: String) -> Result<GitStatus, CommandError> {
     })
 }
 
+#[tauri::command]
+#[specta::specta]
+fn get_file_diff(
+    repo_path: String,
+    file_path: String,
+    target: DiffTarget,
+) -> Result<FileDiff, CommandError> {
+    let path_buf = PathBuf::from(&repo_path);
+    let repo = git::discover_repository(&path_buf).map_err(|source| {
+        CommandError::from(AppError::GitError {
+            path: path_buf.clone(),
+            source,
+        })
+    })?;
+
+    // Validate file_path to prevent path traversal attacks
+    if file_path.contains("..") || Path::new(&file_path).is_absolute() {
+        return Err(CommandError::Git {
+            path: file_path,
+            message: "Invalid file path".to_string(),
+        });
+    }
+
+    git::get_file_diff(&repo, &file_path, target).map_err(|source| {
+        CommandError::from(AppError::GitError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_mode = parse_app_mode().unwrap_or_else(|e| {
@@ -172,7 +203,11 @@ pub fn run() {
     });
 
     let builder = tauri_specta::Builder::<tauri::Wry>::new()
-        .commands(tauri_specta::collect_commands![get_app_mode, get_git_status]);
+        .commands(tauri_specta::collect_commands![
+            get_app_mode,
+            get_git_status,
+            get_file_diff
+        ]);
 
     #[cfg(debug_assertions)]
     builder
