@@ -125,22 +125,60 @@ pub enum DiffTarget {
     Unstaged,
 }
 
-/// File contents for diff rendering
-#[derive(Debug, Clone, Serialize, Deserialize, Type)]
+/// Content of a file - either readable text or opaque binary
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum FileContent {
+    Text { contents: String },
+    Binary { size: u64 },
+}
+
+/// A file version for diff rendering
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
-pub struct FileContents {
+pub struct DiffFile {
     pub name: String,
-    pub contents: String,
     pub lang: Option<String>,
+    /// None = file doesn't exist in this version
+    pub content: Option<FileContent>,
 }
 
 /// Result of getting file contents for diff
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 pub struct GitFileContents {
-    pub old_file: FileContents,
-    pub new_file: FileContents,
-    pub is_binary: bool,
+    pub old_file: DiffFile,
+    pub new_file: DiffFile,
+}
+
+/// Convert a git blob to FileContent
+/// Returns None for missing blobs (new/deleted files)
+fn blob_to_content(blob: Option<git2::Blob>) -> Option<FileContent> {
+    blob.map(|b| {
+        let content = b.content();
+        if content.contains(&0) {
+            FileContent::Binary {
+                size: content.len() as u64,
+            }
+        } else {
+            FileContent::Text {
+                contents: String::from_utf8_lossy(content).into_owned(),
+            }
+        }
+    })
+}
+
+/// Convert raw bytes to FileContent
+fn bytes_to_content(bytes: &[u8]) -> FileContent {
+    if bytes.contains(&0) {
+        FileContent::Binary {
+            size: bytes.len() as u64,
+        }
+    } else {
+        FileContent::Text {
+            contents: String::from_utf8_lossy(bytes).into_owned(),
+        }
+    }
 }
 
 /// Get old and new file contents for diff rendering.
@@ -190,24 +228,7 @@ pub fn get_git_file_contents(
 
     let lang = extension_to_lang(file_path);
 
-    // Get the blob content as a string, returning empty string for None (new/deleted files)
-    // Uses null byte check for binary detection (consistent with workdir file handling)
-    fn blob_to_string(blob: Option<git2::Blob>) -> (String, bool) {
-        match blob {
-            Some(b) => {
-                let content = b.content();
-                let is_binary = content.contains(&0);
-                if is_binary {
-                    (String::new(), true)
-                } else {
-                    (String::from_utf8_lossy(content).into_owned(), false)
-                }
-            }
-            None => (String::new(), false),
-        }
-    }
-
-    let (old_content, new_content, is_binary) = match target {
+    let (old_content, new_content) = match target {
         DiffTarget::Staged => {
             // Old: content from HEAD commit
             let head_blob = repo
@@ -224,9 +245,7 @@ pub fn get_git_file_contents(
                 .get_path(Path::new(file_path), 0)
                 .and_then(|entry| repo.find_blob(entry.id).ok());
 
-            let (old, is_binary_old) = blob_to_string(head_blob);
-            let (new, is_binary_new) = blob_to_string(index_blob);
-            (old, new, is_binary_old || is_binary_new)
+            (blob_to_content(head_blob), blob_to_content(index_blob))
         }
         DiffTarget::Unstaged => {
             // Old: content from index
@@ -241,11 +260,11 @@ pub fn get_git_file_contents(
                 .workdir()
                 .ok_or_else(|| git2::Error::from_str("Repository has no working directory"))?;
             let full_path = workdir.join(file_path);
-            // Read file directly, handling NotFound as empty (deleted file)
+            // Read file directly, handling NotFound as None (deleted file)
             // This avoids TOCTOU race condition from exists() + read() pattern
             let workdir_content = match std::fs::read(&full_path) {
-                Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+                Ok(bytes) => Some(bytes_to_content(&bytes)),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
                 Err(e) => {
                     return Err(git2::Error::from_str(&format!(
                         "Failed to read file: {}",
@@ -254,31 +273,21 @@ pub fn get_git_file_contents(
                 }
             };
 
-            let (old, is_binary_old) = blob_to_string(index_blob);
-            // Check if workdir content is binary (contains null bytes)
-            let is_binary_new = workdir_content.contains('\0');
-            let new = if is_binary_new {
-                String::new()
-            } else {
-                workdir_content
-            };
-
-            (old, new, is_binary_old || is_binary_new)
+            (blob_to_content(index_blob), workdir_content)
         }
     };
 
     Ok(GitFileContents {
-        old_file: FileContents {
+        old_file: DiffFile {
             name: file_path.to_string(),
-            contents: old_content,
             lang: lang.clone(),
+            content: old_content,
         },
-        new_file: FileContents {
+        new_file: DiffFile {
             name: file_path.to_string(),
-            contents: new_content,
             lang,
+            content: new_content,
         },
-        is_binary,
     })
 }
 
@@ -948,6 +957,22 @@ mod tests {
         assert_eq!(diff.hunks.len(), 2, "Expected 2 hunks for distant changes");
     }
 
+    /// Helper to extract text content from FileContent
+    fn get_text_contents(content: &Option<FileContent>) -> Option<&str> {
+        match content {
+            Some(FileContent::Text { contents }) => Some(contents.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Helper to extract binary size from FileContent
+    fn get_binary_size(content: &Option<FileContent>) -> Option<u64> {
+        match content {
+            Some(FileContent::Binary { size }) => Some(*size),
+            _ => None,
+        }
+    }
+
     #[test]
     fn test_get_git_file_contents_staged_new_file() {
         let (temp_dir, repo) = create_test_repo();
@@ -964,12 +989,11 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "new.ts", DiffTarget::Staged).unwrap();
 
-        // Old content should be empty (new file)
-        assert!(contents.old_file.contents.is_empty());
-        assert_eq!(contents.new_file.contents, new_content);
+        // Old content should be None (new file)
+        assert!(contents.old_file.content.is_none());
+        assert_eq!(get_text_contents(&contents.new_file.content), Some(new_content));
         assert_eq!(contents.old_file.lang, Some("typescript".to_string()));
         assert_eq!(contents.new_file.lang, Some("typescript".to_string()));
-        assert!(!contents.is_binary);
     }
 
     #[test]
@@ -990,10 +1014,9 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "file.rs", DiffTarget::Staged).unwrap();
 
-        assert_eq!(contents.old_file.contents, original);
-        assert_eq!(contents.new_file.contents, modified);
+        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
+        assert_eq!(get_text_contents(&contents.new_file.content), Some(modified));
         assert_eq!(contents.old_file.lang, Some("rust".to_string()));
-        assert!(!contents.is_binary);
     }
 
     #[test]
@@ -1012,10 +1035,9 @@ mod tests {
         let contents = get_git_file_contents(&repo, "file.py", DiffTarget::Unstaged).unwrap();
 
         // For unstaged: old is from index (same as HEAD after commit), new is from workdir
-        assert_eq!(contents.old_file.contents, original);
-        assert_eq!(contents.new_file.contents, modified);
+        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
+        assert_eq!(get_text_contents(&contents.new_file.content), Some(modified));
         assert_eq!(contents.old_file.lang, Some("python".to_string()));
-        assert!(!contents.is_binary);
     }
 
     #[test]
@@ -1032,9 +1054,8 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "file.txt", DiffTarget::Unstaged).unwrap();
 
-        assert_eq!(contents.old_file.contents, original);
-        assert!(contents.new_file.contents.is_empty()); // File deleted
-        assert!(!contents.is_binary);
+        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
+        assert!(contents.new_file.content.is_none()); // File deleted
     }
 
     #[test]
@@ -1054,8 +1075,57 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "file.txt", DiffTarget::Staged).unwrap();
 
-        assert_eq!(contents.old_file.contents, original);
-        assert!(contents.new_file.contents.is_empty()); // Not in index anymore
-        assert!(!contents.is_binary);
+        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
+        assert!(contents.new_file.content.is_none()); // Not in index anymore
+    }
+
+    #[test]
+    fn test_get_git_file_contents_binary_file() {
+        let (temp_dir, repo) = create_test_repo();
+
+        // Create initial commit to establish HEAD
+        commit_file(&repo, "existing.txt", "existing", "Initial commit");
+
+        // Create and stage a binary file (contains null bytes)
+        let binary_content: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x00, 0x0D, 0x0A, 0x1A];
+        fs::write(temp_dir.path().join("image.png"), &binary_content).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("image.png")).unwrap();
+        index.write().unwrap();
+
+        let contents = get_git_file_contents(&repo, "image.png", DiffTarget::Staged).unwrap();
+
+        // Old content should be None (new file)
+        assert!(contents.old_file.content.is_none());
+        // New content should be Binary with correct size
+        assert_eq!(get_binary_size(&contents.new_file.content), Some(binary_content.len() as u64));
+    }
+
+    #[test]
+    fn test_get_git_file_contents_binary_modified() {
+        let (_temp_dir, repo) = create_test_repo();
+
+        // Create and commit initial binary file
+        let original_binary: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x00, 0x01, 0x02, 0x03];
+        let repo_path = repo.workdir().unwrap();
+        fs::write(repo_path.join("data.bin"), &original_binary).unwrap();
+        let mut index = repo.index().unwrap();
+        index.add_path(Path::new("data.bin")).unwrap();
+        index.write().unwrap();
+        let tree_id = index.write_tree().unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let sig = git2::Signature::now("Test User", "test@example.com").unwrap();
+        repo.commit(Some("HEAD"), &sig, &sig, "Add binary", &tree, &[])
+            .unwrap();
+
+        // Modify the binary file (different size)
+        let modified_binary: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x00, 0x0D, 0x0A, 0x1A, 0x0A, 0xFF, 0xFE];
+        fs::write(repo_path.join("data.bin"), &modified_binary).unwrap();
+
+        let contents = get_git_file_contents(&repo, "data.bin", DiffTarget::Unstaged).unwrap();
+
+        // Both old and new should be Binary with their respective sizes
+        assert_eq!(get_binary_size(&contents.old_file.content), Some(original_binary.len() as u64));
+        assert_eq!(get_binary_size(&contents.new_file.content), Some(modified_binary.len() as u64));
     }
 }

@@ -59,6 +59,14 @@ export type AppMode = { type: "empty" } | { type: "git"; path: string } | { type
  */
 export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; path: string; message: string }
 /**
+ * A file version for diff rendering
+ */
+export type DiffFile = { name: string; lang: string | null; 
+/**
+ * None = file doesn't exist in this version
+ */
+content: FileContent | null }
+/**
  * A hunk (section) of a diff
  */
 export type DiffHunk = { oldStart: number; oldLines: number; newStart: number; newLines: number; header: string; lines: DiffLine[] }
@@ -71,9 +79,9 @@ export type DiffLine = { changeType: LineChangeType; content: string; oldLineNo:
  */
 export type DiffTarget = "staged" | "unstaged"
 /**
- * File contents for diff rendering
+ * Content of a file - either readable text or opaque binary
  */
-export type FileContents = { name: string; contents: string; lang: string | null }
+export type FileContent = { type: "text"; contents: string } | { type: "binary"; size: number }
 /**
  * Complete diff for a single file
  */
@@ -83,7 +91,7 @@ export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "untrack
 /**
  * Result of getting file contents for diff
  */
-export type GitFileContents = { oldFile: FileContents; newFile: FileContents; isBinary: boolean }
+export type GitFileContents = { oldFile: DiffFile; newFile: DiffFile }
 export type GitStatus = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] }
 /**
  * Type of change for a diff line

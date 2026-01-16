@@ -342,3 +342,23 @@
     }
   }
 }
+
+/* Optimize large diff scrolling with content-visibility */
+@layer components {
+  /* Apply content-visibility to diff rows for better scroll performance */
+  pierre-diffs {
+    /* Ensure hardware acceleration for scrolling */
+    will-change: scroll-position;
+    /* Use layout/style/paint containment - NOT strict, which includes size
+       containment and breaks intrinsic sizing for content-visibility children */
+    contain: layout style paint;
+
+    /* Style the diff rows to use content-visibility for off-screen optimization */
+    & [data-line-type] {
+      content-visibility: auto;
+      /* Use explicit size without 'auto' keyword - auto forces layout measurement
+         which defeats the purpose of content-visibility optimization */
+      contain-intrinsic-block-size: 22px;
+    }
+  }
+}

@@ -1,17 +1,17 @@
 import type { FileContents, SupportedLanguages } from '@pierre/diffs/react';
 
-import type { DiffStyle } from './diff-view-provider';
-
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { MultiFileDiff } from '@pierre/diffs/react';
+import { preloadMultiFileDiff } from '@pierre/diffs/ssr';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FileContents as TauriFileContents } from '../../../tauri-bindings';
+import type { DiffFile } from '../../../tauri-bindings';
+import type { DiffStyle } from './diff-view-provider';
 
 interface DiffViewerProps {
-  oldFile: TauriFileContents | null;
-  newFile: TauriFileContents | null;
-  isBinary: boolean;
+  oldFile: DiffFile | null;
+  newFile: DiffFile | null;
   isLoading: boolean;
   error: string | null;
   onRetry?: () => void;
@@ -19,12 +19,56 @@ interface DiffViewerProps {
   diffStyle?: DiffStyle;
 }
 
-function toFileContents(file: TauriFileContents): FileContents {
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function getExtension(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot) : '';
+}
+
+function toFileContents(file: DiffFile): FileContents {
   return {
     name: file.name,
-    contents: file.contents,
+    contents: file.content?.type === 'text' ? file.content.contents : '',
     lang: (file.lang ?? undefined) as SupportedLanguages | undefined
   };
+}
+
+// Threshold for considering a diff "large" - preload for better UX
+const LARGE_DIFF_LINE_THRESHOLD = 500;
+
+// Timeout for preloading to prevent UI from being stuck indefinitely
+const PRELOAD_TIMEOUT_MS = 10_000;
+
+function countLines(content: string): number {
+  if (!content) return 0;
+  return content.split('\n').length;
+}
+
+// djb2 hash function - fast and good distribution for strings
+function djb2Hash(str: string): number {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+  }
+  return hash >>> 0; // Convert to unsigned 32-bit integer
+}
+
+// Generate a cache key for the diff based on file contents and options
+function generateCacheKey(
+  oldFile: FileContents,
+  newFile: FileContents,
+  diffStyle: DiffStyle,
+  isDark: boolean
+): string {
+  // Hash actual content to ensure unique keys for different files
+  const oldHash = djb2Hash(oldFile.contents);
+  const newHash = djb2Hash(newFile.contents);
+  return `${oldFile.name}:${oldHash}:${newFile.name}:${newHash}:${diffStyle}:${isDark ? 'dark' : 'light'}`;
 }
 
 function EmptyState() {
@@ -78,57 +122,245 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
   );
 }
 
-function BinaryFileState() {
+function BinaryFileState({ oldFile, newFile }: { oldFile: DiffFile; newFile: DiffFile }) {
+  const oldSize = oldFile.content?.type === 'binary' ? oldFile.content.size : null;
+  const newSize = newFile.content?.type === 'binary' ? newFile.content.size : null;
+  const ext = getExtension(newFile.name || oldFile.name);
+
+  // Build metadata line: ".ext · size" or just "size"
+  const sizePart = (() => {
+    if (oldSize !== null && newSize !== null && oldSize !== newSize) {
+      return `${formatFileSize(Number(oldSize))} → ${formatFileSize(Number(newSize))}`;
+    }
+    return formatFileSize(Number(newSize ?? oldSize ?? 0));
+  })();
+  const metadata = ext ? `${ext} · ${sizePart}` : sizePart;
+
   return (
-    <div className="flex flex-1 items-center justify-center">
+    <div className="flex flex-1 items-center justify-center" role="status">
       <div className="mx-auto grid place-items-center text-center">
         <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 ring-1 ring-border/50">
           <HugeiconsIcon icon={File01Icon} size={20} className="text-muted-foreground" />
         </div>
-        <p className="text-sm text-muted-foreground">Binary file changed</p>
-        <p className="mt-1 text-xs text-muted-foreground">Cannot display diff for binary files</p>
+        <p className="text-sm text-muted-foreground">Binary content</p>
+        <p className="mt-1 text-xs text-muted-foreground">{metadata}</p>
       </div>
     </div>
   );
 }
 
-export function DiffViewer({
+function PreloadingState({ totalLines }: { totalLines: number }) {
+  return (
+    <div className="flex flex-1 items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+          <HugeiconsIcon icon={ReloadIcon} size={20} className="animate-spin text-primary" />
+        </div>
+        <p className="text-sm text-muted-foreground">Rendering large diff...</p>
+        <p className="text-xs text-muted-foreground/60">{totalLines.toLocaleString()} lines</p>
+      </div>
+    </div>
+  );
+}
+
+interface PreloadedDiffViewerProps {
+  oldFile: FileContents;
+  newFile: FileContents;
+  diffStyle: DiffStyle;
+  isDark: boolean;
+}
+
+const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
   oldFile,
   newFile,
-  isBinary,
-  isLoading,
-  error,
-  onRetry,
-  isDark,
-  diffStyle = 'split'
-}: DiffViewerProps) {
-  const convertedFiles =
-    oldFile && newFile
-      ? {
-          oldFile: toFileContents(oldFile),
-          newFile: toFileContents(newFile)
+  diffStyle,
+  isDark
+}: PreloadedDiffViewerProps) {
+  const [prerenderedHTML, setPrerenderedHTML] = useState<string | null>(null);
+  const [isPreloading, setIsPreloading] = useState(false);
+
+  // Memoize line counts to avoid O(n) recalculations on each render
+  const totalLines = useMemo(
+    () => countLines(oldFile.contents) + countLines(newFile.contents),
+    [oldFile.contents, newFile.contents]
+  );
+
+  const large = totalLines > LARGE_DIFF_LINE_THRESHOLD;
+  const cacheKey = generateCacheKey(oldFile, newFile, diffStyle, isDark);
+  const themeType = isDark ? ('dark' as const) : ('light' as const);
+
+  // Track render version to prevent stale results from being applied
+  const renderVersionRef = useRef(0);
+
+  // Memoize file objects with stable dependencies (primitive values only)
+  const oldFileWithCache = useMemo(
+    () => ({
+      name: oldFile.name,
+      contents: oldFile.contents,
+      lang: oldFile.lang,
+      cacheKey
+    }),
+    [oldFile.name, oldFile.contents, oldFile.lang, cacheKey]
+  );
+  const newFileWithCache = useMemo(
+    () => ({
+      name: newFile.name,
+      contents: newFile.contents,
+      lang: newFile.lang,
+      cacheKey
+    }),
+    [newFile.name, newFile.contents, newFile.lang, cacheKey]
+  );
+
+  // Memoize options to avoid re-renders
+  const options = useMemo(
+    () => ({
+      diffStyle,
+      overflow: 'scroll' as const,
+      themeType,
+      expandUnchanged: false
+    }),
+    [diffStyle, themeType]
+  );
+
+  // Preload large diffs for better performance
+  useEffect(() => {
+    if (!large) {
+      setPrerenderedHTML(null);
+      return;
+    }
+
+    // Increment version to track this render cycle
+    renderVersionRef.current += 1;
+    const currentVersion = renderVersionRef.current;
+
+    const abortController = new AbortController();
+    setIsPreloading(true);
+
+    async function preload() {
+      let isCancelled = false;
+
+      // Create abort promise that rejects when cleanup runs or timeout expires
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const abortPromise = new Promise<never>((_, reject) => {
+        // Register abort listener first to ensure isCancelled is set before rejection
+        abortController.signal.addEventListener(
+          'abort',
+          () => {
+            isCancelled = true;
+            if (timeoutId !== undefined) clearTimeout(timeoutId);
+            reject(new Error('Preloading aborted'));
+          },
+          { once: true }
+        );
+
+        timeoutId = setTimeout(() => {
+          isCancelled = true;
+          reject(new Error(`Preloading timed out after ${PRELOAD_TIMEOUT_MS}ms`));
+        }, PRELOAD_TIMEOUT_MS);
+      });
+
+      try {
+        // Race preload against abort/timeout - abandon result if aborted
+        const result = await Promise.race([
+          preloadMultiFileDiff({
+            oldFile: oldFileWithCache,
+            newFile: newFileWithCache,
+            options
+          }),
+          abortPromise
+        ]);
+
+        // Clear timeout on success to prevent memory leak
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
+
+        // Only apply result if this is still the current render and not cancelled
+        if (!isCancelled && currentVersion === renderVersionRef.current) {
+          setPrerenderedHTML(result.prerenderedHTML);
+          setIsPreloading(false);
         }
-      : null;
+      } catch (error) {
+        // Clear timeout to prevent memory leak
+        if (timeoutId !== undefined) clearTimeout(timeoutId);
 
-  const options = {
+        // Skip logging for expected abort/timeout errors
+        const isAbortError =
+          error instanceof Error &&
+          (error.message.includes('aborted') || error.message.includes('timed out'));
+
+        if (!isAbortError) {
+          console.warn('[DiffViewer] Preloading failed, falling back to normal rendering:', error);
+        }
+
+        // Fall back to normal rendering if not cancelled
+        if (!isCancelled && currentVersion === renderVersionRef.current) {
+          setPrerenderedHTML(null);
+          setIsPreloading(false);
+        }
+      }
+    }
+
+    void preload();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [
+    large,
+    oldFile.name,
+    oldFile.contents,
+    oldFile.lang,
+    newFile.name,
+    newFile.contents,
+    newFile.lang,
     diffStyle,
-    overflow: 'scroll' as const,
-    themeType: isDark ? ('dark' as const) : ('light' as const),
-    expandUnchanged: true
-  };
+    themeType,
+    cacheKey
+  ]);
 
-  if (isLoading) return <LoadingState />;
-  if (error !== null) return <ErrorState message={error} onRetry={onRetry} />;
-  if (isBinary) return <BinaryFileState />;
-  if (convertedFiles === null) return <EmptyState />;
+  // Show preloading state for large diffs
+  if (large && isPreloading) {
+    return <PreloadingState totalLines={totalLines} />;
+  }
 
   return (
     <div className="flex-1 overflow-auto">
       <MultiFileDiff
-        oldFile={convertedFiles.oldFile}
-        newFile={convertedFiles.newFile}
+        oldFile={oldFileWithCache}
+        newFile={newFileWithCache}
         options={options}
+        prerenderedHTML={prerenderedHTML ?? undefined}
       />
     </div>
+  );
+});
+
+export function DiffViewer({
+  oldFile,
+  newFile,
+  isLoading,
+  error,
+  onRetry,
+  isDark = false,
+  diffStyle = 'split'
+}: DiffViewerProps) {
+  if (isLoading) return <LoadingState />;
+  if (error !== null) return <ErrorState message={error} onRetry={onRetry} />;
+  if (!oldFile || !newFile) return <EmptyState />;
+
+  const hasBinary = oldFile.content?.type === 'binary' || newFile.content?.type === 'binary';
+  if (hasBinary) return <BinaryFileState oldFile={oldFile} newFile={newFile} />;
+
+  const convertedOldFile = toFileContents(oldFile);
+  const convertedNewFile = toFileContents(newFile);
+
+  return (
+    <PreloadedDiffViewer
+      key={`${convertedOldFile.name}:${convertedNewFile.name}`}
+      oldFile={convertedOldFile}
+      newFile={convertedNewFile}
+      diffStyle={diffStyle}
+      isDark={isDark}
+    />
   );
 }
