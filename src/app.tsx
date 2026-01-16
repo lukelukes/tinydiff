@@ -9,17 +9,24 @@ import {
   SidebarInset,
   SidebarProvider
 } from '#features/components/ui/sidebar';
+import {
+  DiffViewer,
+  highlighterOptions,
+  poolOptions,
+  useGitFileContents
+} from '#features/diff-viewer';
 import { FileTree, useGitStatus } from '#features/file-tree';
 import {
+  CodeFolderIcon,
+  File01Icon,
   GitBranchIcon,
   Moon02Icon,
-  Sun02Icon,
   ReloadIcon,
-  CodeFolderIcon,
-  File01Icon
+  Sun02Icon
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { useCallback, useState } from 'react';
+import { WorkerPoolContextProvider } from '@pierre/diffs/react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { CommandError, DiffTarget } from '../tauri-bindings';
 
@@ -102,19 +109,48 @@ function GitMode({ path }: { path: string }) {
   const { state, refresh } = useGitStatus(path);
   const { isDark, toggle } = useTheme();
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [_selectedTarget, setSelectedTarget] = useState<DiffTarget | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<DiffTarget | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleSelectFile = (filePath: string, target: DiffTarget) => {
+  const { state: fileContentsState, refresh: refreshFileContents } = useGitFileContents(
+    path,
+    selectedFile,
+    selectedTarget
+  );
+
+  const handleSelectFile = useCallback((filePath: string, target: DiffTarget) => {
     setSelectedFile(filePath);
     setSelectedTarget(target);
-  };
+  }, []);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await refresh();
     setTimeout(() => setIsRefreshing(false), 300);
   }, [refresh]);
+
+  const diffViewerProps = useMemo(() => {
+    if (fileContentsState.status === 'success') {
+      return {
+        oldFile: fileContentsState.data.oldFile,
+        newFile: fileContentsState.data.newFile,
+        isBinary: fileContentsState.data.isBinary,
+        isLoading: false,
+        error: null
+      };
+    }
+    return {
+      oldFile: null,
+      newFile: null,
+      isBinary: false,
+      isLoading: fileContentsState.status === 'loading',
+      error: fileContentsState.status === 'error' ? getErrorMessage(fileContentsState.error) : null
+    };
+  }, [fileContentsState]);
+
+  const handleRetry = useCallback(() => {
+    void refreshFileContents();
+  }, [refreshFileContents]);
 
   // Get folder name from path
   const folderName = path.split('/').pop() || path;
@@ -219,21 +255,8 @@ function GitMode({ path }: { path: string }) {
         </header>
 
         {/* Main content */}
-        <div className="flex flex-1 items-center justify-center">
-          {selectedFile ? (
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Diff view coming soon</p>
-              <p className="text-xs text-muted-foreground mt-1 font-mono">{selectedFile}</p>
-            </div>
-          ) : (
-            <div className="mx-auto grid place-items-center text-center">
-              <div className="mb-4 flex items-center justify-center w-12 h-12 rounded-xl bg-muted/50 ring-1 ring-border/50">
-                <HugeiconsIcon icon={File01Icon} size={20} className="text-muted-foreground" />
-              </div>
-              <p className="text-sm text-muted-foreground">Select a file to view diff</p>
-              <p className="text-xs text-muted-foreground mt-1">Choose from the sidebar</p>
-            </div>
-          )}
+        <div className="flex flex-1 overflow-hidden">
+          <DiffViewer {...diffViewerProps} onRetry={handleRetry} isDark={isDark} />
         </div>
       </SidebarInset>
     </SidebarProvider>
@@ -267,9 +290,11 @@ function ModeContent({ mode }: { mode: AppMode }) {
 
 function App({ mode }: { mode: AppMode }) {
   return (
-    <div className="flex h-full w-full flex-col bg-background text-foreground">
-      <ModeContent mode={mode} />
-    </div>
+    <WorkerPoolContextProvider poolOptions={poolOptions} highlighterOptions={highlighterOptions}>
+      <div className="flex h-full w-full flex-col bg-background text-foreground">
+        <ModeContent mode={mode} />
+      </div>
+    </WorkerPoolContextProvider>
   );
 }
 
