@@ -113,7 +113,8 @@ export function DiffViewer({
   const options = {
     diffStyle,
     overflow: 'scroll' as const,
-    themeType: isDark ? ('dark' as const) : ('light' as const)
+    themeType: isDark ? ('dark' as const) : ('light' as const),
+    expandUnchanged: true
   };
 
   if (isLoading) return <LoadingState />;
