@@ -26,7 +26,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { WorkerPoolContextProvider } from '@pierre/diffs/react';
-import { useCallback, useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import type { CommandError, DiffTarget } from '../tauri-bindings';
 
@@ -51,13 +51,13 @@ function useTheme() {
     return false;
   });
 
-  const toggle = useCallback(() => {
+  const toggle = () => {
     setIsDark((prev) => {
       const next = !prev;
       document.documentElement.classList.toggle('dark', next);
       return next;
     });
-  }, []);
+  };
 
   return { isDark, toggle };
 }
@@ -118,39 +118,38 @@ function GitMode({ path }: { path: string }) {
     selectedTarget
   );
 
-  const handleSelectFile = useCallback((filePath: string, target: DiffTarget) => {
+  const handleSelectFile = (filePath: string, target: DiffTarget) => {
     setSelectedFile(filePath);
     setSelectedTarget(target);
-  }, []);
+  };
 
-  const handleRefresh = useCallback(async () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
     await refresh();
     setTimeout(() => setIsRefreshing(false), 300);
-  }, [refresh]);
+  };
 
-  const diffViewerProps = useMemo(() => {
-    if (fileContentsState.status === 'success') {
-      return {
-        oldFile: fileContentsState.data.oldFile,
-        newFile: fileContentsState.data.newFile,
-        isBinary: fileContentsState.data.isBinary,
-        isLoading: false,
-        error: null
-      };
-    }
-    return {
-      oldFile: null,
-      newFile: null,
-      isBinary: false,
-      isLoading: fileContentsState.status === 'loading',
-      error: fileContentsState.status === 'error' ? getErrorMessage(fileContentsState.error) : null
-    };
-  }, [fileContentsState]);
+  const diffViewerProps =
+    fileContentsState.status === 'success'
+      ? {
+          oldFile: fileContentsState.data.oldFile,
+          newFile: fileContentsState.data.newFile,
+          isBinary: fileContentsState.data.isBinary,
+          isLoading: false,
+          error: null
+        }
+      : {
+          oldFile: null,
+          newFile: null,
+          isBinary: false,
+          isLoading: fileContentsState.status === 'loading',
+          error:
+            fileContentsState.status === 'error' ? getErrorMessage(fileContentsState.error) : null
+        };
 
-  const handleRetry = useCallback(() => {
+  const handleRetry = () => {
     void refreshFileContents();
-  }, [refreshFileContents]);
+  };
 
   // Get folder name from path
   const folderName = path.split('/').pop() || path;

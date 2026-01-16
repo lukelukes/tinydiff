@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 
 import { commands, type GitStatus, type CommandError } from '../../../tauri-bindings';
 
@@ -10,7 +10,7 @@ type GitStatusState =
 export function useGitStatus(repoPath: string) {
   const [state, setState] = useState<GitStatusState>({ status: 'loading' });
 
-  const refresh = useCallback(async () => {
+  const refresh = async () => {
     setState({ status: 'loading' });
     const result = await commands.getGitStatus(repoPath);
     if (result.status === 'ok') {
@@ -18,11 +18,11 @@ export function useGitStatus(repoPath: string) {
     } else {
       setState({ status: 'error', error: result.error });
     }
-  }, [repoPath]);
+  };
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [repoPath]);
 
   return { state, refresh };
 }

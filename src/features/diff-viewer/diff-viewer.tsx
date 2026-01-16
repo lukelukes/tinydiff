@@ -3,7 +3,6 @@ import type { FileContents, SupportedLanguages } from '@pierre/diffs/react';
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { MultiFileDiff } from '@pierre/diffs/react';
-import { useMemo } from 'react';
 
 import type { FileContents as TauriFileContents } from '../../../tauri-bindings';
 
@@ -99,22 +98,19 @@ export function DiffViewer({
   onRetry,
   isDark
 }: DiffViewerProps) {
-  const convertedFiles = useMemo(() => {
-    if (!oldFile || !newFile) return null;
-    return {
-      oldFile: toFileContents(oldFile),
-      newFile: toFileContents(newFile)
-    };
-  }, [oldFile, newFile]);
+  const convertedFiles =
+    oldFile && newFile
+      ? {
+          oldFile: toFileContents(oldFile),
+          newFile: toFileContents(newFile)
+        }
+      : null;
 
-  const options = useMemo(
-    () => ({
-      diffStyle: 'split' as const,
-      overflow: 'scroll' as const,
-      themeType: isDark ? ('dark' as const) : ('light' as const)
-    }),
-    [isDark]
-  );
+  const options = {
+    diffStyle: 'split' as const,
+    overflow: 'scroll' as const,
+    themeType: isDark ? ('dark' as const) : ('light' as const)
+  };
 
   if (isLoading) return <LoadingState />;
   if (error !== null) return <ErrorState message={error} onRetry={onRetry} />;

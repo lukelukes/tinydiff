@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   commands,
@@ -20,7 +20,7 @@ export function useGitFileContents(
 ) {
   const [state, setState] = useState<GitFileContentsState>({ status: 'idle' });
 
-  const refresh = useCallback(async () => {
+  const refresh = async () => {
     if (filePath === null || target === null) {
       setState({ status: 'idle' });
       return;
@@ -32,7 +32,7 @@ export function useGitFileContents(
     } else {
       setState({ status: 'error', error: result.error });
     }
-  }, [repoPath, filePath, target]);
+  };
 
   useEffect(() => {
     let cancelled = false;

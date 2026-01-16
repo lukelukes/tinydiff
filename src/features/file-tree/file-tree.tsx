@@ -17,7 +17,7 @@ import {
   FolderOpenIcon
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import React, { useMemo, useRef, useEffect } from 'react';
+import { useRef } from 'react';
 
 import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 
@@ -31,29 +31,28 @@ interface FileTreeProps {
 }
 
 export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) {
-  const tree = useMemo(() => buildFileTree(status), [status]);
+  const tree = buildFileTree(status);
   const containerRef = useRef<HTMLUListElement>(null);
 
   const { focusedPath, setFocusedPath, expandedPaths, toggleExpanded, handleKeyDown } =
     useFileTreeKeyboard({
       tree,
-      selectedFile,
       onSelectFile
     });
 
-  // Focus the container when focusedPath changes
-  useEffect(() => {
-    if (focusedPath !== null && containerRef.current !== null) {
-      containerRef.current.focus();
-    }
-  }, [focusedPath]);
+  // Wrap keyboard handler to ensure container stays focused during navigation
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    handleKeyDown(e);
+    // Keep focus on container for continued keyboard navigation
+    containerRef.current?.focus();
+  };
 
   if (tree.length === 0) {
     return <div className="p-4 text-sm text-muted-foreground">No changes detected</div>;
   }
 
   return (
-    <SidebarMenu ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} className="outline-none">
+    <SidebarMenu ref={containerRef} tabIndex={0} onKeyDown={onKeyDown} className="outline-none">
       {tree.map((node) => (
         <TreeItem
           key={node.path}
@@ -82,7 +81,7 @@ interface TreeItemProps {
   toggleExpanded: (path: string) => void;
 }
 
-function TreeItemInner({
+function TreeItem({
   node,
   selectedFile,
   onSelectFile,
@@ -186,17 +185,3 @@ function TreeItemInner({
     </SidebarMenuItem>
   );
 }
-
-// Custom memo comparator: compare `expanded` as a primitive, ignore `expandedPaths` reference
-const TreeItem = React.memo(TreeItemInner, (prev, next) => {
-  return (
-    prev.node === next.node &&
-    prev.selectedFile === next.selectedFile &&
-    prev.focusedPath === next.focusedPath &&
-    prev.expanded === next.expanded &&
-    prev.setFocusedPath === next.setFocusedPath &&
-    prev.onSelectFile === next.onSelectFile &&
-    prev.toggleExpanded === next.toggleExpanded
-    // Note: expandedPaths is intentionally NOT compared - we use `expanded` instead
-  );
-});
