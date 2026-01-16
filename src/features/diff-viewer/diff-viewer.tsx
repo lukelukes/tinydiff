@@ -1,5 +1,7 @@
 import type { FileContents, SupportedLanguages } from '@pierre/diffs/react';
 
+import type { DiffStyle } from './diff-view-provider';
+
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { MultiFileDiff } from '@pierre/diffs/react';
@@ -14,6 +16,7 @@ interface DiffViewerProps {
   error: string | null;
   onRetry?: () => void;
   isDark?: boolean;
+  diffStyle?: DiffStyle;
 }
 
 function toFileContents(file: TauriFileContents): FileContents {
@@ -96,7 +99,8 @@ export function DiffViewer({
   isLoading,
   error,
   onRetry,
-  isDark
+  isDark,
+  diffStyle = 'split'
 }: DiffViewerProps) {
   const convertedFiles =
     oldFile && newFile
@@ -107,7 +111,7 @@ export function DiffViewer({
       : null;
 
   const options = {
-    diffStyle: 'split' as const,
+    diffStyle,
     overflow: 'scroll' as const,
     themeType: isDark ? ('dark' as const) : ('light' as const)
   };

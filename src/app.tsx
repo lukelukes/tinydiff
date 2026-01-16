@@ -11,8 +11,10 @@ import {
 } from '#features/components/ui/sidebar';
 import {
   DiffViewer,
+  DiffViewProvider,
   highlighterOptions,
   poolOptions,
+  useDiffView,
   useGitFileContents
 } from '#features/diff-viewer';
 import { FileTree, useGitStatus } from '#features/file-tree';
@@ -20,6 +22,8 @@ import {
   CodeFolderIcon,
   File01Icon,
   GitBranchIcon,
+  LayoutTwoColumnIcon,
+  LayoutTwoRowIcon,
   Moon02Icon,
   ReloadIcon,
   Sun02Icon
@@ -108,6 +112,7 @@ function EmptyMode() {
 function GitMode({ path }: { path: string }) {
   const { state, refresh } = useGitStatus(path);
   const { isDark, toggle } = useTheme();
+  const { diffStyle, setDiffStyle } = useDiffView();
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<DiffTarget | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -191,74 +196,87 @@ function GitMode({ path }: { path: string }) {
 
   return (
     <SidebarProvider>
-      <Sidebar collapsible="none" className="border-r border-sidebar-border/60">
-        <SidebarHeader className="border-b border-sidebar-border/60 h-12 px-4 justify-center">
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10">
-              <HugeiconsIcon icon={GitBranchIcon} size={14} className="text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm truncate text-sidebar-foreground">{folderName}</p>
-            </div>
-            <span className="text-xs text-muted-foreground tabular-nums">{changeCount}</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent className="px-4 py-3">
-          <SidebarGroup className="p-0">
-            <SidebarGroupContent>
-              <FileTree
-                status={state.data}
-                selectedFile={selectedFile}
-                onSelectFile={handleSelectFile}
-              />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-      </Sidebar>
-      <SidebarInset className="flex flex-col">
-        {/* Header bar */}
-        <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/60 px-4 bg-background">
-          <div className="flex items-center gap-2">
-            {selectedFile && (
-              <div className="flex items-center gap-2">
-                <HugeiconsIcon icon={File01Icon} size={14} className="text-muted-foreground" />
-                <span className="text-sm font-medium text-foreground">{selectedFile}</span>
+        <Sidebar collapsible="none" className="border-r border-sidebar-border/60">
+            <SidebarHeader className="border-b border-sidebar-border/60 h-12 px-4 justify-center">
+              <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-center w-6 h-6 rounded-md bg-primary/10">
+                  <HugeiconsIcon icon={GitBranchIcon} size={14} className="text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate text-sidebar-foreground">{folderName}</p>
+                </div>
+                <span className="text-xs text-muted-foreground tabular-nums">{changeCount}</span>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={handleRefresh}
-              className="group flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/80 active:scale-95 transition-all text-muted-foreground hover:text-foreground"
-              aria-label="Refresh"
-              disabled={isRefreshing}
-            >
-              <HugeiconsIcon
-                icon={ReloadIcon}
-                size={15}
-                className={`transition-transform ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-45'}`}
-              />
-            </button>
-            <button
-              onClick={toggle}
-              className="group flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/80 active:scale-95 transition-all text-muted-foreground hover:text-foreground"
-              aria-label="Toggle theme"
-            >
-              <HugeiconsIcon
-                icon={isDark ? Sun02Icon : Moon02Icon}
-                size={15}
-                className="transition-transform group-hover:scale-110"
-              />
-            </button>
-          </div>
-        </header>
+            </SidebarHeader>
+            <SidebarContent className="px-4 py-3">
+              <SidebarGroup className="p-0">
+                <SidebarGroupContent>
+                  <FileTree
+                    status={state.data}
+                    selectedFile={selectedFile}
+                    onSelectFile={handleSelectFile}
+                  />
+                </SidebarGroupContent>
+              </SidebarGroup>
+            </SidebarContent>
+          </Sidebar>
+          <SidebarInset className="flex flex-col">
+            {/* Header bar */}
+            <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/60 px-4 bg-background">
+              <div className="flex items-center gap-2">
+                {selectedFile && (
+                  <div className="flex items-center gap-2">
+                    <HugeiconsIcon icon={File01Icon} size={14} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">{selectedFile}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-0.5">
+                <button
+                  onClick={() => {
+                    setDiffStyle(diffStyle === 'split' ? 'unified' : 'split');
+                  }}
+                  className="group flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/80 active:scale-95 transition-all text-muted-foreground hover:text-foreground"
+                  aria-label={`Switch to ${diffStyle === 'split' ? 'unified' : 'split'} view`}
+                >
+                  <HugeiconsIcon
+                    icon={diffStyle === 'split' ? LayoutTwoColumnIcon : LayoutTwoRowIcon}
+                    size={15}
+                    className="transition-transform group-hover:scale-110"
+                  />
+                </button>
+                <button
+                  onClick={handleRefresh}
+                  className="group flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/80 active:scale-95 transition-all text-muted-foreground hover:text-foreground"
+                  aria-label="Refresh"
+                  disabled={isRefreshing}
+                >
+                  <HugeiconsIcon
+                    icon={ReloadIcon}
+                    size={15}
+                    className={`transition-transform ${isRefreshing ? 'animate-spin' : 'group-hover:rotate-45'}`}
+                  />
+                </button>
+                <button
+                  onClick={toggle}
+                  className="group flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/80 active:scale-95 transition-all text-muted-foreground hover:text-foreground"
+                  aria-label="Toggle theme"
+                >
+                  <HugeiconsIcon
+                    icon={isDark ? Sun02Icon : Moon02Icon}
+                    size={15}
+                    className="transition-transform group-hover:scale-110"
+                  />
+                </button>
+              </div>
+            </header>
 
-        {/* Main content */}
-        <div className="flex flex-1 overflow-hidden">
-          <DiffViewer {...diffViewerProps} onRetry={handleRetry} isDark={isDark} />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+            {/* Main content */}
+            <div className="flex flex-1 overflow-hidden">
+              <DiffViewer {...diffViewerProps} onRetry={handleRetry} isDark={isDark} diffStyle={diffStyle} />
+            </div>
+          </SidebarInset>
+      </SidebarProvider>
   );
 }
 
@@ -279,7 +297,11 @@ function ModeContent({ mode }: { mode: AppMode }) {
     case 'empty':
       return <EmptyMode />;
     case 'git':
-      return <GitMode path={mode.path} />;
+      return (
+        <DiffViewProvider>
+          <GitMode path={mode.path} />
+        </DiffViewProvider>
+      );
     case 'file':
       return <FileMode fileA={mode.fileA} fileB={mode.fileB} />;
     default:
