@@ -12,7 +12,6 @@
     "#tauri-bindings/*": "./tauri-bindings/*.ts"
   },
   "scripts": {
-    "start": "vite",
     "dev": "vite",
     "build": "tsc && vite build",
     "test": "vitest --run",
@@ -23,10 +22,11 @@
     "test:browser:headed": "HEADED=true bun vitest run --project browser",
     "tauri": "tauri",
     "typecheck": "tsc",
-    "lint": "oxlint --type-aware --type-check --config oxlint.json src",
-    "lint:fix": "oxlint --type-aware --type-check --config oxlint.json --fix src",
+    "lint": "oxlint --type-aware --type-check --config oxlint.json -f stylish src",
+    "lint:fix": "oxlint --type-aware --type-check --config oxlint.json -f stylish --fix src",
     "fmt": "oxfmt --config oxfmt.json --write",
     "fmt:check": "oxfmt --config oxfmt.json --check",
+    "validate": "bun run fmt && bun run lint:fix && concurrently -g 'bun:build' 'bun:test'",
     "upgrade-deps": "bunx npm-check-updates -i",
     "knip": "knip"
   },
@@ -53,6 +53,7 @@
     "@vitejs/plugin-react": "5.1.2",
     "@vitest/browser-webdriverio": "4.0.17",
     "babel-plugin-react-compiler": "1.0.0",
+    "concurrently": "9.2.1",
     "eslint-plugin-react-hooks": "7.0.1",
     "fast-check": "4.5.3",
     "knip": "5.81.0",

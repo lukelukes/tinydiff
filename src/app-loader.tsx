@@ -2,7 +2,7 @@ import type { AppMode } from '#core/app-mode';
 import type { ErrorInfo, ReactNode } from 'react';
 
 import { getAppMode } from '#core/app-mode';
-import { Component, useEffect, useState } from 'react';
+import { Component, useEffect, useRef, useState } from 'react';
 
 import App from './app.tsx';
 import { ErrorDisplay } from './components/error-display.tsx';
@@ -59,33 +59,38 @@ type LoadState =
 
 function AppLoader() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    let mounted = true;
+    mountedRef.current = true;
     getAppMode()
       .then((mode) => {
-        if (mounted) setState({ status: 'ready', mode });
+        if (mountedRef.current) setState({ status: 'ready', mode });
       })
       .catch((e: unknown) => {
-        if (mounted) {
+        if (mountedRef.current) {
           const error = e instanceof Error ? e : new Error(String(e));
           console.error('Failed to load app mode:', error);
           setState({ status: 'error', error });
         }
       });
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
   const retry = () => {
     setState({ status: 'loading' });
     getAppMode()
-      .then((mode) => setState({ status: 'ready', mode }))
+      .then((mode) => {
+        if (mountedRef.current) setState({ status: 'ready', mode });
+      })
       .catch((e: unknown) => {
-        const error = e instanceof Error ? e : new Error(String(e));
-        console.error('Failed to load app mode:', error);
-        setState({ status: 'error', error });
+        if (mountedRef.current) {
+          const error = e instanceof Error ? e : new Error(String(e));
+          console.error('Failed to load app mode:', error);
+          setState({ status: 'error', error });
+        }
       });
   };
 

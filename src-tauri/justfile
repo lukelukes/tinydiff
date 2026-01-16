@@ -10,7 +10,7 @@ clippy:
 test:
     cargo test
 
-check: fmt-check clippy test
+check: fmt clippy test
 
 build:
     cargo build --release

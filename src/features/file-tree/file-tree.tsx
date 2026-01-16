@@ -21,7 +21,7 @@ import { useRef } from 'react';
 
 import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 
-import { buildFileTree, getStatusLabel, getStatusStyles, type FileTreeNode } from './tree-builder';
+import { buildFileTree, getStatusLabel, type FileTreeNode } from './tree-builder';
 import { useFileTreeKeyboard } from './use-file-tree-keyboard';
 
 interface FileTreeProps {

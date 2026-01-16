@@ -991,7 +991,10 @@ mod tests {
 
         // Old content should be None (new file)
         assert!(contents.old_file.content.is_none());
-        assert_eq!(get_text_contents(&contents.new_file.content), Some(new_content));
+        assert_eq!(
+            get_text_contents(&contents.new_file.content),
+            Some(new_content)
+        );
         assert_eq!(contents.old_file.lang, Some("typescript".to_string()));
         assert_eq!(contents.new_file.lang, Some("typescript".to_string()));
     }
@@ -1014,8 +1017,14 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "file.rs", DiffTarget::Staged).unwrap();
 
-        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
-        assert_eq!(get_text_contents(&contents.new_file.content), Some(modified));
+        assert_eq!(
+            get_text_contents(&contents.old_file.content),
+            Some(original)
+        );
+        assert_eq!(
+            get_text_contents(&contents.new_file.content),
+            Some(modified)
+        );
         assert_eq!(contents.old_file.lang, Some("rust".to_string()));
     }
 
@@ -1035,8 +1044,14 @@ mod tests {
         let contents = get_git_file_contents(&repo, "file.py", DiffTarget::Unstaged).unwrap();
 
         // For unstaged: old is from index (same as HEAD after commit), new is from workdir
-        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
-        assert_eq!(get_text_contents(&contents.new_file.content), Some(modified));
+        assert_eq!(
+            get_text_contents(&contents.old_file.content),
+            Some(original)
+        );
+        assert_eq!(
+            get_text_contents(&contents.new_file.content),
+            Some(modified)
+        );
         assert_eq!(contents.old_file.lang, Some("python".to_string()));
     }
 
@@ -1054,7 +1069,10 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "file.txt", DiffTarget::Unstaged).unwrap();
 
-        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
+        assert_eq!(
+            get_text_contents(&contents.old_file.content),
+            Some(original)
+        );
         assert!(contents.new_file.content.is_none()); // File deleted
     }
 
@@ -1075,7 +1093,10 @@ mod tests {
 
         let contents = get_git_file_contents(&repo, "file.txt", DiffTarget::Staged).unwrap();
 
-        assert_eq!(get_text_contents(&contents.old_file.content), Some(original));
+        assert_eq!(
+            get_text_contents(&contents.old_file.content),
+            Some(original)
+        );
         assert!(contents.new_file.content.is_none()); // Not in index anymore
     }
 
@@ -1098,7 +1119,10 @@ mod tests {
         // Old content should be None (new file)
         assert!(contents.old_file.content.is_none());
         // New content should be Binary with correct size
-        assert_eq!(get_binary_size(&contents.new_file.content), Some(binary_content.len() as u64));
+        assert_eq!(
+            get_binary_size(&contents.new_file.content),
+            Some(binary_content.len() as u64)
+        );
     }
 
     #[test]
@@ -1119,13 +1143,21 @@ mod tests {
             .unwrap();
 
         // Modify the binary file (different size)
-        let modified_binary: Vec<u8> = vec![0x89, 0x50, 0x4E, 0x47, 0x00, 0x0D, 0x0A, 0x1A, 0x0A, 0xFF, 0xFE];
+        let modified_binary: Vec<u8> = vec![
+            0x89, 0x50, 0x4E, 0x47, 0x00, 0x0D, 0x0A, 0x1A, 0x0A, 0xFF, 0xFE,
+        ];
         fs::write(repo_path.join("data.bin"), &modified_binary).unwrap();
 
         let contents = get_git_file_contents(&repo, "data.bin", DiffTarget::Unstaged).unwrap();
 
         // Both old and new should be Binary with their respective sizes
-        assert_eq!(get_binary_size(&contents.old_file.content), Some(original_binary.len() as u64));
-        assert_eq!(get_binary_size(&contents.new_file.content), Some(modified_binary.len() as u64));
+        assert_eq!(
+            get_binary_size(&contents.old_file.content),
+            Some(original_binary.len() as u64)
+        );
+        assert_eq!(
+            get_binary_size(&contents.new_file.content),
+            Some(modified_binary.len() as u64)
+        );
     }
 }

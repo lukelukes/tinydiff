@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import { commands, type GitStatus, type CommandError } from '../../../tauri-bindings';
 
@@ -10,7 +10,7 @@ type GitStatusState =
 export function useGitStatus(repoPath: string) {
   const [state, setState] = useState<GitStatusState>({ status: 'loading' });
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setState({ status: 'loading' });
     const result = await commands.getGitStatus(repoPath);
     if (result.status === 'ok') {
@@ -18,11 +18,12 @@ export function useGitStatus(repoPath: string) {
     } else {
       setState({ status: 'error', error: result.error });
     }
-  };
+  }, [repoPath]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- data fetching pattern, setState is in async callback
     void refresh();
-  }, [repoPath]);
+  }, [refresh]);
 
   return { state, refresh };
 }

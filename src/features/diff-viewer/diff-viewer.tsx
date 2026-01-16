@@ -49,13 +49,15 @@ function countLines(content: string): number {
   return content.split('\n').length;
 }
 
-// djb2 hash function - fast and good distribution for strings
 function djb2Hash(str: string): number {
   let hash = 5381;
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+    const codePoint = str.codePointAt(i) ?? 0;
+    hash = ((hash << 5) + hash) ^ codePoint;
   }
-  return hash >>> 0; // Convert to unsigned 32-bit integer
+  // Convert to unsigned 32-bit integer
+  // eslint-disable-next-line unicorn/prefer-math-trunc -- >>> 0 converts to unsigned, Math.trunc doesn't
+  return hash >>> 0;
 }
 
 // Generate a cache key for the diff based on file contents and options
@@ -176,10 +178,6 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
   diffStyle,
   isDark
 }: PreloadedDiffViewerProps) {
-  const [prerenderedHTML, setPrerenderedHTML] = useState<string | null>(null);
-  const [isPreloading, setIsPreloading] = useState(false);
-
-  // Memoize line counts to avoid O(n) recalculations on each render
   const totalLines = useMemo(
     () => countLines(oldFile.contents) + countLines(newFile.contents),
     [oldFile.contents, newFile.contents]
@@ -189,10 +187,11 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
   const cacheKey = generateCacheKey(oldFile, newFile, diffStyle, isDark);
   const themeType = isDark ? ('dark' as const) : ('light' as const);
 
-  // Track render version to prevent stale results from being applied
+  const [prerenderedHTML, setPrerenderedHTML] = useState<string | null>(null);
+  const [isPreloading, setIsPreloading] = useState(large);
+
   const renderVersionRef = useRef(0);
 
-  // Memoize file objects with stable dependencies (primitive values only)
   const oldFileWithCache = useMemo(
     () => ({
       name: oldFile.name,
@@ -212,7 +211,6 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     [newFile.name, newFile.contents, newFile.lang, cacheKey]
   );
 
-  // Memoize options to avoid re-renders
   const options = useMemo(
     () => ({
       diffStyle,
@@ -223,19 +221,19 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     [diffStyle, themeType]
   );
 
-  // Preload large diffs for better performance
   useEffect(() => {
     if (!large) {
-      setPrerenderedHTML(null);
       return;
     }
 
-    // Increment version to track this render cycle
     renderVersionRef.current += 1;
     const currentVersion = renderVersionRef.current;
 
     const abortController = new AbortController();
+    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- preload initialization, async results handled in callback
     setIsPreloading(true);
+    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- clear stale prerendered HTML before new preload
+    setPrerenderedHTML(null);
 
     async function preload() {
       let isCancelled = false;
@@ -305,18 +303,7 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     return () => {
       abortController.abort();
     };
-  }, [
-    large,
-    oldFile.name,
-    oldFile.contents,
-    oldFile.lang,
-    newFile.name,
-    newFile.contents,
-    newFile.lang,
-    diffStyle,
-    themeType,
-    cacheKey
-  ]);
+  }, [large, oldFileWithCache, newFileWithCache, options]);
 
   // Show preloading state for large diffs
   if (large && isPreloading) {
