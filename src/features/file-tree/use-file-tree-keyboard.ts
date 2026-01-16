@@ -84,10 +84,6 @@ export function useFileTreeKeyboard({
   // Get flattened visible nodes
   const flatNodes = useMemo(() => flattenTree(tree, expandedPaths), [tree, expandedPaths]);
 
-  // Use ref to provide stable callback references that don't change on every render
-  const expandedPathsRef = useRef(expandedPaths);
-  expandedPathsRef.current = expandedPaths;
-
   const toggleExpanded = useCallback((path: string) => {
     setExpandedPaths((prev) => {
       const next = new Set(prev);
@@ -99,8 +95,6 @@ export function useFileTreeKeyboard({
       return next;
     });
   }, []);
-
-  const isExpanded = useCallback((path: string) => expandedPathsRef.current.has(path), []);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -137,7 +131,7 @@ export function useFileTreeKeyboard({
           if (!currentFlat) break;
 
           if (currentFlat.node.type === 'directory') {
-            if (!isExpanded(currentFlat.node.path)) {
+            if (!expandedPaths.has(currentFlat.node.path)) {
               // Expand the directory
               toggleExpanded(currentFlat.node.path);
             } else if (currentFlat.node.children.length > 0) {
@@ -155,7 +149,7 @@ export function useFileTreeKeyboard({
           e.preventDefault();
           if (!currentFlat) break;
 
-          if (currentFlat.node.type === 'directory' && isExpanded(currentFlat.node.path)) {
+          if (currentFlat.node.type === 'directory' && expandedPaths.has(currentFlat.node.path)) {
             // Collapse the directory
             toggleExpanded(currentFlat.node.path);
           } else if (currentFlat.parentPath !== null) {
@@ -212,7 +206,7 @@ export function useFileTreeKeyboard({
         }
       }
     },
-    [flatNodes, focusedPath, isExpanded, onSelectFile, toggleExpanded]
+    [flatNodes, focusedPath, expandedPaths, onSelectFile, toggleExpanded]
   );
 
   // When selected file changes externally, update focus to match
@@ -226,7 +220,6 @@ export function useFileTreeKeyboard({
     focusedPath,
     setFocusedPath,
     expandedPaths,
-    isExpanded,
     toggleExpanded,
     handleKeyDown
   };

@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 import type { FileEntry, FileStatus, GitStatus } from '../../../tauri-bindings';
 
 export type TreeNodeType = 'file' | 'directory';
@@ -117,17 +119,40 @@ export function getStatusLabel(status: FileStatus): string {
 export function getStatusColorClass(status: FileStatus): string {
   switch (status) {
     case 'added':
+      return 'text-git-added';
     case 'untracked':
-      return 'text-green-500';
+      return 'text-git-untracked';
     case 'modified':
-      return 'text-yellow-500';
+      return 'text-git-modified';
     case 'deleted':
-      return 'text-red-500';
+      return 'text-git-deleted';
     case 'renamed':
-      return 'text-blue-500';
+      return 'text-git-renamed';
     case 'typechange':
-      return 'text-purple-500';
+      return 'text-git-renamed';
     case 'conflicted':
-      return 'text-orange-500';
+      return 'text-git-conflicted';
+  }
+}
+
+/**
+ * Get inline styles for file status badge
+ */
+export function getStatusStyles(status: FileStatus): CSSProperties {
+  switch (status) {
+    case 'added':
+      return { backgroundColor: 'var(--git-added-bg)', color: 'var(--git-added)' };
+    case 'untracked':
+      return { backgroundColor: 'var(--git-untracked-bg)', color: 'var(--git-untracked)' };
+    case 'modified':
+      return { backgroundColor: 'var(--git-modified-bg)', color: 'var(--git-modified)' };
+    case 'deleted':
+      return { backgroundColor: 'var(--git-deleted-bg)', color: 'var(--git-deleted)' };
+    case 'renamed':
+      return { backgroundColor: 'var(--git-renamed-bg)', color: 'var(--git-renamed)' };
+    case 'typechange':
+      return { backgroundColor: 'var(--git-renamed-bg)', color: 'var(--git-renamed)' };
+    case 'conflicted':
+      return { backgroundColor: 'var(--git-conflicted-bg)', color: 'var(--git-conflicted)' };
   }
 }

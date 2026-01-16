@@ -5,22 +5,23 @@ import {
 } from '#features/components/ui/collapsible';
 import {
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
+  sidebarMenuButtonVariants,
   SidebarMenuItem,
   SidebarMenuSub
 } from '#features/components/ui/sidebar';
-import { ChevronRight, File, Folder } from 'lucide-react';
-import React, { useMemo, useRef, useEffect, useCallback } from 'react';
+import {
+  ArrowRight01Icon,
+  File01Icon,
+  Folder01Icon,
+  FolderOpenIcon
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/react';
+import React, { useMemo, useRef, useEffect } from 'react';
 
 import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 
-import {
-  buildFileTree,
-  getStatusLabel,
-  getStatusColorClass,
-  type FileTreeNode
-} from './tree-builder';
+import { buildFileTree, getStatusLabel, getStatusStyles, type FileTreeNode } from './tree-builder';
 import { useFileTreeKeyboard } from './use-file-tree-keyboard';
 
 interface FileTreeProps {
@@ -33,7 +34,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const tree = useMemo(() => buildFileTree(status), [status]);
   const containerRef = useRef<HTMLUListElement>(null);
 
-  const { focusedPath, setFocusedPath, isExpanded, toggleExpanded, handleKeyDown } =
+  const { focusedPath, setFocusedPath, expandedPaths, toggleExpanded, handleKeyDown } =
     useFileTreeKeyboard({
       tree,
       selectedFile,
@@ -52,12 +53,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   }
 
   return (
-    <SidebarMenu
-      ref={containerRef}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      className="outline-none focus:ring-1 focus:ring-sidebar-ring focus:ring-inset"
-    >
+    <SidebarMenu ref={containerRef} tabIndex={0} onKeyDown={handleKeyDown} className="outline-none">
       {tree.map((node) => (
         <TreeItem
           key={node.path}
@@ -66,7 +62,8 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
           onSelectFile={onSelectFile}
           focusedPath={focusedPath}
           setFocusedPath={setFocusedPath}
-          isExpanded={isExpanded}
+          expanded={node.type === 'directory' ? expandedPaths.has(node.path) : false}
+          expandedPaths={expandedPaths}
           toggleExpanded={toggleExpanded}
         />
       ))}
@@ -80,41 +77,35 @@ interface TreeItemProps {
   onSelectFile: (path: string, target: DiffTarget) => void;
   focusedPath: string | null;
   setFocusedPath: (path: string | null) => void;
-  isExpanded: (path: string) => boolean;
+  expanded: boolean;
+  expandedPaths: Set<string>;
   toggleExpanded: (path: string) => void;
 }
 
-const TreeItem = React.memo(function TreeItem({
+function TreeItemInner({
   node,
   selectedFile,
   onSelectFile,
   focusedPath,
   setFocusedPath,
-  isExpanded,
+  expanded,
+  expandedPaths,
   toggleExpanded
 }: TreeItemProps) {
   const isFocused = focusedPath === node.path;
 
-  const handleClick = useCallback(() => {
+  const handleClick = () => {
     setFocusedPath(node.path);
     if (node.type === 'file') {
       const target: DiffTarget = node.isStaged ? 'staged' : 'unstaged';
       onSelectFile(node.path, target);
     }
-  }, [node, onSelectFile, setFocusedPath]);
+  };
 
-  const handleDirectoryClick = useCallback(() => {
+  const handleToggle = () => {
     setFocusedPath(node.path);
-  }, [node.path, setFocusedPath]);
-
-  const handleToggle = useCallback(
-    (open: boolean) => {
-      if (open !== isExpanded(node.path)) {
-        toggleExpanded(node.path);
-      }
-    },
-    [node.path, isExpanded, toggleExpanded]
-  );
+    toggleExpanded(node.path);
+  };
 
   if (node.type === 'file') {
     const isSelected = selectedFile === node.path;
@@ -124,42 +115,58 @@ const TreeItem = React.memo(function TreeItem({
         <SidebarMenuButton
           isActive={isSelected}
           onClick={handleClick}
-          className={`${node.isStaged ? 'opacity-100' : 'opacity-60'} ${isFocused && !isSelected ? 'ring-1 ring-inset ring-sidebar-ring' : ''}`}
+          data-focused={isFocused && !isSelected}
+          className={`group/file transition-all duration-150 ${node.isStaged ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
           tabIndex={-1}
         >
-          <File className="size-4" />
-          <span className="truncate">{node.name}</span>
+          <HugeiconsIcon
+            icon={File01Icon}
+            size={14}
+            className="shrink-0 text-muted-foreground group-hover/file:text-muted-foreground transition-colors"
+          />
+          <span className="flex-1 truncate text-sm">{node.name}</span>
+          {node.status && (
+            <span
+              className="ml-2 shrink-0 text-2xs font-semibold"
+              style={{
+                color: `var(--git-${node.status === 'typechange' ? 'renamed' : node.status})`
+              }}
+            >
+              {getStatusLabel(node.status)}
+            </span>
+          )}
         </SidebarMenuButton>
-        {node.status && (
-          <SidebarMenuBadge className={getStatusColorClass(node.status)}>
-            {getStatusLabel(node.status)}
-          </SidebarMenuBadge>
-        )}
       </SidebarMenuItem>
     );
   }
 
-  // Directory node
-  const expanded = isExpanded(node.path);
-
+  // Directory node - use the pre-computed `expanded` prop
   return (
     <SidebarMenuItem>
       <Collapsible
         open={expanded}
         onOpenChange={handleToggle}
-        className="group/collapsible [&[data-open]>button>svg:first-child]:rotate-90"
+        className="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
       >
         <CollapsibleTrigger
-          onClick={handleDirectoryClick}
-          className={`peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-hidden ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 ${isFocused ? 'ring-1 ring-inset' : ''}`}
+          data-focused={isFocused}
+          className={sidebarMenuButtonVariants({ className: 'group/folder' })}
           tabIndex={-1}
         >
-          <ChevronRight className="size-4 transition-transform" />
-          <Folder className="size-4 text-yellow-500" />
+          <HugeiconsIcon
+            icon={ArrowRight01Icon}
+            size={14}
+            className="shrink-0 text-muted-foreground transition-transform"
+          />
+          <HugeiconsIcon
+            icon={expanded ? FolderOpenIcon : Folder01Icon}
+            size={14}
+            className="shrink-0 text-icon-folder"
+          />
           <span>{node.name}</span>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <SidebarMenuSub>
+          <SidebarMenuSub className="pl-5">
             {node.children.map((child) => (
               <TreeItem
                 key={child.path}
@@ -168,7 +175,8 @@ const TreeItem = React.memo(function TreeItem({
                 onSelectFile={onSelectFile}
                 focusedPath={focusedPath}
                 setFocusedPath={setFocusedPath}
-                isExpanded={isExpanded}
+                expanded={child.type === 'directory' ? expandedPaths.has(child.path) : false}
+                expandedPaths={expandedPaths}
                 toggleExpanded={toggleExpanded}
               />
             ))}
@@ -176,5 +184,19 @@ const TreeItem = React.memo(function TreeItem({
         </CollapsibleContent>
       </Collapsible>
     </SidebarMenuItem>
+  );
+}
+
+// Custom memo comparator: compare `expanded` as a primitive, ignore `expandedPaths` reference
+const TreeItem = React.memo(TreeItemInner, (prev, next) => {
+  return (
+    prev.node === next.node &&
+    prev.selectedFile === next.selectedFile &&
+    prev.focusedPath === next.focusedPath &&
+    prev.expanded === next.expanded &&
+    prev.setFocusedPath === next.setFocusedPath &&
+    prev.onSelectFile === next.onSelectFile &&
+    prev.toggleExpanded === next.toggleExpanded
+    // Note: expandedPaths is intentionally NOT compared - we use `expanded` instead
   );
 });
