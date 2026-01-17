@@ -10,10 +10,10 @@ const DEFAULT_TIMEOUT_MS = 5000;
 export function getAppMode(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<AppMode> {
   return Promise.race([
     invoke<AppMode>('get_app_mode'),
-    new Promise<never>((_, reject) =>
+    new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error(`App initialization timed out after ${timeoutMs}ms`));
-      }, timeoutMs)
-    )
+      }, timeoutMs);
+    })
   ]);
 }

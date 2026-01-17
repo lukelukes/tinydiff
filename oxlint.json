@@ -2,9 +2,9 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "categories": {
     "correctness": "error",
-    "pedantic": "warn",
-    "perf": "warn",
-    "suspicious": "warn"
+    "pedantic": "error",
+    "perf": "error",
+    "suspicious": "error"
   },
   "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "src/vite-env.d.ts", "*.config.*"],
   "jsPlugins": [
@@ -25,13 +25,17 @@
     "vitest"
   ],
   "rules": {
+    "typescript/strict-boolean-expressions": "off",
+    "import/max-dependencies": "off",
     "import/no-unassigned-import": [
       "error",
       {
         "allow": ["**/*.css"]
       }
     ],
+    "max-lines": "off",
     "max-lines-per-function": "off",
+    "no-useless-return": "off",
     "no-warning-comments": "off",
     "react-hooks-js/component-hook-factories": "error",
     "react-hooks-js/config": "error",
@@ -48,6 +52,9 @@
     "react-hooks-js/static-components": "error",
     "react-hooks-js/unsupported-syntax": "warn",
     "react-hooks-js/use-memo": "error",
+    "react-perf/jsx-no-jsx-as-prop": "off",
+    "react-perf/jsx-no-new-function-as-prop": "off",
+    "react-perf/jsx-no-new-object-as-prop": "off",
     "react/react-in-jsx-scope": "off",
     "unicorn/prefer-query-selector": "off"
   },

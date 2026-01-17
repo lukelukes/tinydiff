@@ -184,6 +184,7 @@ function Sidebar({
           className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
           style={
             {
+              // oxlint-disable-next-line no-unsafe-type-assertion
               '--sidebar-width': SIDEBAR_WIDTH_MOBILE
             } as React.CSSProperties
           }
@@ -501,7 +502,7 @@ function SidebarMenuButton({
       },
       props
     ),
-    render: !tooltip ? render : TooltipTrigger,
+    render: tooltip ? TooltipTrigger : render,
     state: {
       slot: 'sidebar-menu-button',
       sidebar: 'menu-button',
@@ -602,6 +603,7 @@ function SidebarMenuSkeleton({
         data-sidebar="menu-skeleton-text"
         style={
           {
+            // oxlint-disable-next-line no-unsafe-type-assertion
             '--skeleton-width': width
           } as React.CSSProperties
         }

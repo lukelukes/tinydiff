@@ -3,54 +3,7 @@ import { useState } from 'react';
 import type { DiffTarget } from '../../../tauri-bindings';
 import type { FileTreeNode } from './tree-builder';
 
-interface FlatNode {
-  node: FileTreeNode;
-  depth: number;
-  parentPath: string | null;
-}
-
-/**
- * Get all directory paths from a tree
- */
-function getAllDirectoryPaths(nodes: FileTreeNode[]): Set<string> {
-  const paths = new Set<string>();
-
-  function walk(nodes: FileTreeNode[]) {
-    for (const node of nodes) {
-      if (node.type === 'directory') {
-        paths.add(node.path);
-        walk(node.children);
-      }
-    }
-  }
-
-  walk(nodes);
-  return paths;
-}
-
-/**
- * Flatten tree nodes into a list, respecting expanded state.
- * Only includes nodes that are visible (parent directories are expanded).
- */
-function flattenTree(
-  nodes: FileTreeNode[],
-  collapsedPaths: Set<string>,
-  depth = 0,
-  parentPath: string | null = null
-): FlatNode[] {
-  const result: FlatNode[] = [];
-
-  for (const node of nodes) {
-    result.push({ node, depth, parentPath });
-
-    // Directory is expanded if NOT in the collapsed set
-    if (node.type === 'directory' && !collapsedPaths.has(node.path)) {
-      result.push(...flattenTree(node.children, collapsedPaths, depth + 1, node.path));
-    }
-  }
-
-  return result;
-}
+import { flattenTree, getAllDirectoryPaths } from './tree-utils';
 
 interface UseFileTreeKeyboardOptions {
   tree: FileTreeNode[];
@@ -75,9 +28,9 @@ export function useFileTreeKeyboard({ tree, onSelectFile }: UseFileTreeKeyboardO
     setCollapsedPaths((prev) => {
       const next = new Set(prev);
       if (next.has(path)) {
-        next.delete(path); // Was collapsed, now expand
+        next.delete(path);
       } else {
-        next.add(path); // Was expanded, now collapse
+        next.add(path);
       }
       return next;
     });

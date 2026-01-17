@@ -66,6 +66,7 @@ function AppLoader() {
     getAppMode()
       .then((mode) => {
         if (mountedRef.current) setState({ status: 'ready', mode });
+        return;
       })
       .catch((e: unknown) => {
         if (mountedRef.current) {
@@ -84,6 +85,7 @@ function AppLoader() {
     getAppMode()
       .then((mode) => {
         if (mountedRef.current) setState({ status: 'ready', mode });
+        return;
       })
       .catch((e: unknown) => {
         if (mountedRef.current) {

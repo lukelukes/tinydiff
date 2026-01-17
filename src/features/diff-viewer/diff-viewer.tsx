@@ -1,4 +1,4 @@
-import type { FileContents, SupportedLanguages } from '@pierre/diffs/react';
+import type { FileContents } from '@pierre/diffs/react';
 
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -34,7 +34,8 @@ function toFileContents(file: DiffFile): FileContents {
   return {
     name: file.name,
     contents: file.content?.type === 'text' ? file.content.contents : '',
-    lang: (file.lang ?? undefined) as SupportedLanguages | undefined
+    // oxlint-disable-next-line no-unsafe-type-assertion
+    lang: (file.lang ?? 'text') as FileContents['lang']
   };
 }
 

@@ -219,7 +219,6 @@ function GitMode({ path }: { path: string }) {
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col">
-        {/* Header bar */}
         <header className="flex h-12 shrink-0 items-center justify-between border-b border-border/60 px-4 bg-background">
           <div className="flex items-center gap-2">
             {selectedFile && (
@@ -244,7 +243,9 @@ function GitMode({ path }: { path: string }) {
               />
             </button>
             <button
-              onClick={handleRefresh}
+              onClick={() => {
+                void handleRefresh();
+              }}
               className="group flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/80 active:scale-95 transition-all text-muted-foreground hover:text-foreground"
               aria-label="Refresh"
               disabled={isRefreshing}
