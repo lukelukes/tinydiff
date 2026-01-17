@@ -28,7 +28,7 @@
     "test:watch": "bun vitest",
     "typecheck": "tsc",
     "upgrade-deps": "bunx npm-check-updates -i",
-    "validate": "bun run fmt && bun run lint:fix && concurrently -g 'bun:build' 'bun:test'"
+    "validate": "bun run fmt && bun run lint:fix && concurrently -g 'bun:build --logLevel warn' 'bun:test'"
   },
   "dependencies": {
     "@base-ui/react": "1.1.0",
