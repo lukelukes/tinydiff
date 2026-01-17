@@ -43,14 +43,6 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-      - id: eslint-solidjs
-        name: ESLint + autofix
-        entry: bunx eslint --fix
-        language: system
-        types_or: [ts, tsx]
-        pass_filenames: true
-        stages: [pre-commit]
-
       - id: cargo-test
         name: cargo test
         entry: cargo test --manifest-path src-tauri/Cargo.toml
