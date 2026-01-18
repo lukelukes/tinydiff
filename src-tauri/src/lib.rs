@@ -1,7 +1,9 @@
+pub mod comments;
 pub mod fs;
 pub mod git;
 
 use clap::{CommandFactory, Parser, error::ErrorKind};
+use comments::{Comment, CommentCollection};
 use fs::ReadFileResult;
 use git::{DiffTarget, FileDiff, GitFileContents, GitStatus};
 use serde::{Deserialize, Serialize};
@@ -250,6 +252,55 @@ fn read_file(
     })
 }
 
+fn validate_repo_path(repo_path: &Path) -> Result<(), CommandError> {
+    if !repo_path.is_dir() {
+        return Err(CommandError::Path {
+            path: repo_path.display().to_string(),
+            message: "Path does not exist or is not a directory".to_string(),
+        });
+    }
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+fn load_comments(repo_path: String) -> Result<CommentCollection, CommandError> {
+    let path_buf = PathBuf::from(&repo_path);
+    validate_repo_path(&path_buf)?;
+    comments::load_comments(&path_buf).map_err(|source| {
+        CommandError::from(AppError::PathError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+fn save_comment(repo_path: String, comment: Comment) -> Result<(), CommandError> {
+    let path_buf = PathBuf::from(&repo_path);
+    validate_repo_path(&path_buf)?;
+    comments::save_comment(&path_buf, comment).map_err(|source| {
+        CommandError::from(AppError::PathError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+fn delete_comment(repo_path: String, comment_id: String) -> Result<bool, CommandError> {
+    let path_buf = PathBuf::from(&repo_path);
+    validate_repo_path(&path_buf)?;
+    comments::delete_comment(&path_buf, &comment_id).map_err(|source| {
+        CommandError::from(AppError::PathError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app_mode = parse_app_mode().unwrap_or_else(|e| {
@@ -268,7 +319,10 @@ pub fn run() {
             get_git_status,
             get_file_diff,
             get_git_file_contents,
-            read_file
+            read_file,
+            load_comments,
+            save_comment,
+            delete_comment
         ]);
 
     #[cfg(debug_assertions)]
