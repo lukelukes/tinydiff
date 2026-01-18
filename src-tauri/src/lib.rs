@@ -277,10 +277,14 @@ fn load_comments(repo_path: String) -> Result<CommentCollection, CommandError> {
 
 #[tauri::command]
 #[specta::specta]
-fn save_comment(repo_path: String, comment: Comment) -> Result<(), CommandError> {
+fn save_comment(
+    repo_path: String,
+    comment: Comment,
+    file_contents: Option<String>,
+) -> Result<(), CommandError> {
     let path_buf = PathBuf::from(&repo_path);
     validate_repo_path(&path_buf)?;
-    comments::save_comment(&path_buf, comment).map_err(|source| {
+    comments::save_comment(&path_buf, comment, file_contents.as_deref()).map_err(|source| {
         CommandError::from(AppError::PathError {
             path: path_buf,
             source,
@@ -294,6 +298,23 @@ fn delete_comment(repo_path: String, comment_id: String) -> Result<bool, Command
     let path_buf = PathBuf::from(&repo_path);
     validate_repo_path(&path_buf)?;
     comments::delete_comment(&path_buf, &comment_id).map_err(|source| {
+        CommandError::from(AppError::PathError {
+            path: path_buf,
+            source,
+        })
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+fn get_comments_for_file(
+    repo_path: String,
+    file_path: String,
+    file_contents: String,
+) -> Result<Vec<Comment>, CommandError> {
+    let path_buf = PathBuf::from(&repo_path);
+    validate_repo_path(&path_buf)?;
+    comments::get_comments_for_file(&path_buf, &file_path, &file_contents).map_err(|source| {
         CommandError::from(AppError::PathError {
             path: path_buf,
             source,
@@ -322,7 +343,8 @@ pub fn run() {
             read_file,
             load_comments,
             save_comment,
-            delete_comment
+            delete_comment,
+            get_comments_for_file
         ]);
 
     #[cfg(debug_assertions)]
