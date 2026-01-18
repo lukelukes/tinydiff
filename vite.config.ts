@@ -1,4 +1,4 @@
-import type { Plugin } from 'vite';
+import type { HtmlTagDescriptor, Plugin } from 'vite';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { defineConfig } from 'vite';
 
 const host = process.env.TAURI_DEV_HOST;
+const profilingEnabled = !!process.env.PROFILING_ENABLED;
 
 function devScripts(): Plugin {
   return {
@@ -26,14 +27,19 @@ function devScripts(): Plugin {
           return [];
         }
 
-        return [
-          { tag: 'script', attrs: { src: '/tauri-mock.js' }, injectTo: 'body' },
-          {
+        const scripts: HtmlTagDescriptor[] = [
+          { tag: 'script', attrs: { src: '/tauri-mock.js' }, injectTo: 'body' }
+        ];
+
+        if (profilingEnabled) {
+          scripts.push({
             tag: 'script',
             attrs: { src: '//unpkg.com/react-scan/dist/auto.global.js' },
             injectTo: 'head'
-          }
-        ];
+          });
+        }
+
+        return scripts;
       }
     }
   };
