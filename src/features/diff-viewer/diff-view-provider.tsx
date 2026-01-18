@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
-import { createContext, use, useMemo, useState } from 'react';
+import { settingsStore } from '#lib/settings-store';
+import { createContext, use, useCallback, useEffect, useMemo, useState } from 'react';
 
 export type DiffStyle = 'split' | 'unified';
 
@@ -13,8 +14,25 @@ export const DiffViewContext = createContext<DiffViewContextValue | null>(null);
 
 export function DiffViewProvider({ children }: { children: ReactNode }) {
   const [diffStyle, setDiffStyle] = useState<DiffStyle>('split');
-  // TODO(settings-1): persist via Rust settings backend
-  const value = useMemo(() => ({ diffStyle, setDiffStyle }), [diffStyle]);
+
+  useEffect(() => {
+    void settingsStore.get<DiffStyle>('viewMode').then((value) => {
+      if (value) {
+        setDiffStyle(value);
+      }
+      return;
+    });
+  }, []);
+
+  const setAndPersist = useCallback((style: DiffStyle) => {
+    setDiffStyle(style);
+    void settingsStore.set('viewMode', style);
+  }, []);
+
+  const value = useMemo(
+    () => ({ diffStyle, setDiffStyle: setAndPersist }),
+    [diffStyle, setAndPersist]
+  );
   return <DiffViewContext value={value}>{children}</DiffViewContext>;
 }
 

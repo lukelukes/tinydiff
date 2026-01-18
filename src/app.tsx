@@ -20,6 +20,7 @@ import {
   type SelectedLineRange
 } from '#features/diff-viewer';
 import { FileTree, useGitStatus } from '#features/file-tree';
+import { settingsStore } from '#lib/settings-store';
 import {
   CodeFolderIcon,
   File01Icon,
@@ -32,7 +33,7 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { WorkerPoolContextProvider } from '@pierre/diffs/react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type { Comment, CommandError, DiffTarget } from '../tauri-bindings';
 
@@ -50,20 +51,30 @@ function getErrorMessage(error: CommandError): string {
 }
 
 function useTheme() {
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
-  const toggle = () => {
+  useEffect(() => {
+    void settingsStore.get<'dark' | 'light'>('theme').then((value) => {
+      if (value) {
+        const dark = value === 'dark';
+        setIsDark(dark);
+        document.documentElement.classList.toggle('dark', dark);
+        localStorage.setItem('tinydiff-theme', value);
+      }
+      return;
+    });
+  }, []);
+
+  const toggle = useCallback(() => {
     setIsDark((prev) => {
       const next = !prev;
+      const theme = next ? 'dark' : 'light';
       document.documentElement.classList.toggle('dark', next);
+      localStorage.setItem('tinydiff-theme', theme);
+      void settingsStore.set('theme', theme);
       return next;
     });
-  };
+  }, []);
 
   return { isDark, toggle };
 }

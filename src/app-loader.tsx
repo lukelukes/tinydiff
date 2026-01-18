@@ -46,8 +46,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 function LoadingScreen() {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center bg-zinc-900">
-      <div className="text-zinc-400">Loading...</div>
+    <div className="flex h-full w-full flex-col items-center justify-center bg-background">
+      <div className="text-muted-foreground">Loading...</div>
     </div>
   );
 }
