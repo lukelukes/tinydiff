@@ -1,5 +1,6 @@
 import type { AppMode } from '#core/app-mode';
 
+import { generateCommentId, useComments } from '#features/comments';
 import {
   Sidebar,
   SidebarContent,
@@ -15,7 +16,8 @@ import {
   highlighterOptions,
   poolOptions,
   useDiffView,
-  useGitFileContents
+  useGitFileContents,
+  type SelectedLineRange
 } from '#features/diff-viewer';
 import { FileTree, useGitStatus } from '#features/file-tree';
 import {
@@ -30,9 +32,9 @@ import {
 } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { WorkerPoolContextProvider } from '@pierre/diffs/react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { CommandError, DiffTarget } from '../tauri-bindings';
+import type { Comment, CommandError, DiffTarget } from '../tauri-bindings';
 
 import './app.css';
 
@@ -123,15 +125,89 @@ function GitMode({ path }: { path: string }) {
     selectedTarget
   );
 
+  const {
+    state: commentsState,
+    pendingComment,
+    saveComment,
+    deleteComment,
+    openCommentForm,
+    closeCommentForm
+  } = useComments(path);
+
+  const [selectedLines, setSelectedLines] = useState<SelectedLineRange | null>(null);
+
+  const fileComments = useMemo(() => {
+    if (commentsState.status !== 'success' || !selectedFile) return [];
+    return commentsState.data.comments.filter((c: Comment) => c.filePath === selectedFile);
+  }, [commentsState, selectedFile]);
+
   const handleSelectFile = (filePath: string, target: DiffTarget) => {
     setSelectedFile(filePath);
     setSelectedTarget(target);
+    closeCommentForm();
+    setSelectedLines(null);
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refresh();
     setIsRefreshing(false);
+  };
+
+  const handleAddComment = (
+    side: 'deletions' | 'additions',
+    lineNumber: number,
+    startLine?: number
+  ) => {
+    openCommentForm(side, lineNumber, startLine);
+    if (startLine !== undefined) {
+      setSelectedLines({
+        side,
+        start: startLine,
+        end: lineNumber
+      });
+    }
+  };
+
+  const handleSubmitComment = async (
+    body: string,
+    _side: 'deletions' | 'additions',
+    lineNumber: number,
+    _startLine?: number
+  ) => {
+    if (!selectedFile) return;
+
+    const newFileContent =
+      fileContentsState.status === 'success' &&
+      fileContentsState.data.newFile.content?.type === 'text'
+        ? fileContentsState.data.newFile.content.contents
+        : '';
+
+    const comment: Comment = {
+      id: generateCommentId(),
+      filePath: selectedFile,
+      lineNumber,
+      body,
+      resolved: false,
+      createdAt: Math.floor(Date.now() / 1000),
+      updatedAt: Math.floor(Date.now() / 1000)
+    };
+
+    const result = await saveComment(comment, newFileContent || null);
+    if (!result.success) {
+      console.error('Failed to save comment:', result.error);
+    }
+    closeCommentForm();
+    setSelectedLines(null);
+  };
+
+  const handleCancelComment = () => {
+    closeCommentForm();
+    setSelectedLines(null);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    await deleteComment(commentId);
   };
 
   const diffViewerProps =
@@ -277,6 +353,13 @@ function GitMode({ path }: { path: string }) {
             onRetry={handleRetry}
             isDark={isDark}
             diffStyle={diffStyle}
+            comments={fileComments}
+            pendingComment={pendingComment}
+            selectedLines={selectedLines}
+            onAddComment={handleAddComment}
+            onSubmitComment={handleSubmitComment}
+            onCancelComment={handleCancelComment}
+            onDeleteComment={handleDeleteComment}
           />
         </div>
       </SidebarInset>

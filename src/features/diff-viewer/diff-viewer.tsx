@@ -1,4 +1,5 @@
-import type { FileContents } from '@pierre/diffs/react';
+import type { SelectedLineRange } from '@pierre/diffs';
+import type { DiffLineAnnotation, FileContents } from '@pierre/diffs/react';
 
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
@@ -6,8 +7,27 @@ import { MultiFileDiff } from '@pierre/diffs/react';
 import { preloadMultiFileDiff } from '@pierre/diffs/ssr';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { DiffFile } from '../../../tauri-bindings';
+import type { Comment, DiffFile } from '../../../tauri-bindings';
+import type { PendingComment } from '../comments';
 import type { DiffStyle } from './diff-view-provider';
+
+import { AddCommentButton, CommentDisplay, CommentForm } from '../comments';
+
+type AnnotationSide = 'deletions' | 'additions';
+
+export type { SelectedLineRange };
+
+interface CommentAnnotation {
+  type: 'comment';
+  comment: Comment;
+}
+
+interface FormAnnotation {
+  type: 'form';
+  startLine?: number;
+}
+
+type AnnotationMetadata = CommentAnnotation | FormAnnotation;
 
 interface DiffViewerProps {
   oldFile: DiffFile | null;
@@ -17,6 +37,18 @@ interface DiffViewerProps {
   onRetry?: () => void;
   isDark?: boolean;
   diffStyle?: DiffStyle;
+  comments?: Comment[];
+  pendingComment?: PendingComment | null;
+  selectedLines?: SelectedLineRange | null;
+  onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
+  onSubmitComment?: (
+    body: string,
+    side: AnnotationSide,
+    lineNumber: number,
+    startLine?: number
+  ) => Promise<void>;
+  onCancelComment?: () => void;
+  onDeleteComment?: (commentId: string) => Promise<void>;
 }
 
 function formatFileSize(bytes: number): string {
@@ -171,13 +203,32 @@ interface PreloadedDiffViewerProps {
   newFile: FileContents;
   diffStyle: DiffStyle;
   isDark: boolean;
+  comments?: Comment[];
+  pendingComment?: PendingComment | null;
+  selectedLines?: SelectedLineRange | null;
+  onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
+  onSubmitComment?: (
+    body: string,
+    side: AnnotationSide,
+    lineNumber: number,
+    startLine?: number
+  ) => Promise<void>;
+  onCancelComment?: () => void;
+  onDeleteComment?: (commentId: string) => Promise<void>;
 }
 
 const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
   oldFile,
   newFile,
   diffStyle,
-  isDark
+  isDark,
+  comments = [],
+  pendingComment,
+  selectedLines,
+  onAddComment,
+  onSubmitComment,
+  onCancelComment,
+  onDeleteComment
 }: PreloadedDiffViewerProps) {
   const totalLines = useMemo(
     () => countLines(oldFile.contents) + countLines(newFile.contents),
@@ -212,7 +263,7 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     [newFile.name, newFile.contents, newFile.lang, cacheKey]
   );
 
-  const options = useMemo(
+  const preloadOptions = useMemo(
     () => ({
       diffStyle,
       overflow: 'scroll' as const,
@@ -221,6 +272,87 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     }),
     [diffStyle, themeType]
   );
+
+  const hasOpenCommentForm = pendingComment !== null;
+
+  const options = useMemo(
+    () => ({
+      diffStyle,
+      overflow: 'scroll' as const,
+      themeType,
+      expandUnchanged: false,
+      enableHoverUtility: !hasOpenCommentForm && !!onAddComment,
+      enableLineSelection: !hasOpenCommentForm && !!onAddComment,
+      onLineSelectionEnd: (range: SelectedLineRange | null) => {
+        if (range === null || !onAddComment) return;
+        const derivedSide = range.endSide ?? range.side;
+        const side: AnnotationSide = derivedSide === 'deletions' ? 'deletions' : 'additions';
+        const endLine = Math.max(range.end, range.start);
+        const startLine = Math.min(range.end, range.start);
+        onAddComment(side, endLine, startLine === endLine ? undefined : startLine);
+      }
+    }),
+    [diffStyle, themeType, hasOpenCommentForm, onAddComment]
+  );
+
+  const lineAnnotations = useMemo(() => {
+    const annotations: DiffLineAnnotation<AnnotationMetadata>[] = [];
+
+    for (const comment of comments) {
+      annotations.push({
+        side: 'additions',
+        lineNumber: comment.lineNumber,
+        metadata: { type: 'comment', comment }
+      });
+    }
+
+    if (pendingComment) {
+      annotations.push({
+        side: pendingComment.side,
+        lineNumber: pendingComment.lineNumber,
+        metadata: { type: 'form', startLine: pendingComment.startLine }
+      });
+    }
+
+    return annotations;
+  }, [comments, pendingComment]);
+
+  const renderAnnotation = (annotation: DiffLineAnnotation<AnnotationMetadata>) => {
+    if (!annotation.metadata) return null;
+
+    if (annotation.metadata.type === 'form') {
+      const { startLine } = annotation.metadata;
+      return (
+        <CommentForm
+          onSubmit={async (body) => {
+            if (onSubmitComment) {
+              await onSubmitComment(body, annotation.side, annotation.lineNumber, startLine);
+            }
+          }}
+          onCancel={() => onCancelComment?.()}
+        />
+      );
+    }
+
+    return <CommentDisplay comment={annotation.metadata.comment} onDelete={onDeleteComment} />;
+  };
+
+  const renderHoverUtility = (
+    getHoveredLine: () => { lineNumber: number; side: AnnotationSide } | undefined
+  ) => {
+    if (!onAddComment) return null;
+
+    return (
+      <AddCommentButton
+        onClick={() => {
+          const hovered = getHoveredLine();
+          if (hovered) {
+            onAddComment(hovered.side, hovered.lineNumber);
+          }
+        }}
+      />
+    );
+  };
 
   useEffect(() => {
     if (!large) {
@@ -265,7 +397,7 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
           preloadMultiFileDiff({
             oldFile: oldFileWithCache,
             newFile: newFileWithCache,
-            options
+            options: preloadOptions
           }),
           abortPromise
         ]);
@@ -304,7 +436,7 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     return () => {
       abortController.abort();
     };
-  }, [large, oldFileWithCache, newFileWithCache, options]);
+  }, [large, oldFileWithCache, newFileWithCache, preloadOptions]);
 
   // Show preloading state for large diffs
   if (large && isPreloading) {
@@ -318,6 +450,10 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
         newFile={newFileWithCache}
         options={options}
         prerenderedHTML={prerenderedHTML ?? undefined}
+        lineAnnotations={lineAnnotations}
+        selectedLines={selectedLines}
+        renderAnnotation={renderAnnotation}
+        renderHoverUtility={onAddComment ? renderHoverUtility : undefined}
       />
     </div>
   );
@@ -330,7 +466,14 @@ export function DiffViewer({
   error,
   onRetry,
   isDark = false,
-  diffStyle = 'split'
+  diffStyle = 'split',
+  comments,
+  pendingComment,
+  selectedLines,
+  onAddComment,
+  onSubmitComment,
+  onCancelComment,
+  onDeleteComment
 }: DiffViewerProps) {
   if (isLoading) return <LoadingState />;
   if (error !== null) return <ErrorState message={error} onRetry={onRetry} />;
@@ -349,6 +492,13 @@ export function DiffViewer({
       newFile={convertedNewFile}
       diffStyle={diffStyle}
       isDark={isDark}
+      comments={comments}
+      pendingComment={pendingComment}
+      selectedLines={selectedLines}
+      onAddComment={onAddComment}
+      onSubmitComment={onSubmitComment}
+      onCancelComment={onCancelComment}
+      onDeleteComment={onDeleteComment}
     />
   );
 }

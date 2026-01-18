@@ -48,9 +48,9 @@ async loadComments(repoPath: string) : Promise<Result<CommentCollection, Command
     else return { status: "error", error: e  as any };
 }
 },
-async saveComment(repoPath: string, comment: Comment) : Promise<Result<null, CommandError>> {
+async saveComment(repoPath: string, comment: Comment, fileContents: string | null) : Promise<Result<null, CommandError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("save_comment", { repoPath, comment }) };
+    return { status: "ok", data: await TAURI_INVOKE("save_comment", { repoPath, comment, fileContents }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -59,6 +59,14 @@ async saveComment(repoPath: string, comment: Comment) : Promise<Result<null, Com
 async deleteComment(repoPath: string, commentId: string) : Promise<Result<boolean, CommandError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("delete_comment", { repoPath, commentId }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getCommentsForFile(repoPath: string, filePath: string, fileContents: string) : Promise<Result<Comment[], CommandError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_comments_for_file", { repoPath, filePath, fileContents }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -82,7 +90,7 @@ export type AppMode = { type: "empty" } | { type: "git"; path: string } | { type
  * Converts AppError variants to a format that can cross the IPC boundary.
  */
 export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; path: string; message: string }
-export type Comment = { id: string; filePath: string; lineNumber: number; contentHash: string; body: string; resolved: boolean; createdAt: number; updatedAt: number }
+export type Comment = { id: string; filePath: string; lineNumber: number; body: string; resolved: boolean; createdAt: number; updatedAt: number; contextWindow?: string | null; unanchored?: boolean }
 export type CommentCollection = { comments: Comment[] }
 /**
  * A file version for diff rendering
