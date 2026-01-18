@@ -39,6 +39,7 @@ interface DiffViewerProps {
   diffStyle?: DiffStyle;
   comments?: Comment[];
   pendingComment?: PendingComment | null;
+  editingCommentId?: string | null;
   selectedLines?: SelectedLineRange | null;
   onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
   onSubmitComment?: (
@@ -48,7 +49,10 @@ interface DiffViewerProps {
     startLine?: number
   ) => Promise<void>;
   onCancelComment?: () => void;
+  onUpdateComment?: (comment: Comment) => Promise<void>;
   onDeleteComment?: (commentId: string) => Promise<void>;
+  onStartEditComment?: (commentId: string) => void;
+  onStopEditComment?: () => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -205,6 +209,7 @@ interface PreloadedDiffViewerProps {
   isDark: boolean;
   comments?: Comment[];
   pendingComment?: PendingComment | null;
+  editingCommentId?: string | null;
   selectedLines?: SelectedLineRange | null;
   onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
   onSubmitComment?: (
@@ -214,7 +219,10 @@ interface PreloadedDiffViewerProps {
     startLine?: number
   ) => Promise<void>;
   onCancelComment?: () => void;
+  onUpdateComment?: (comment: Comment) => Promise<void>;
   onDeleteComment?: (commentId: string) => Promise<void>;
+  onStartEditComment?: (commentId: string) => void;
+  onStopEditComment?: () => void;
 }
 
 const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
@@ -224,11 +232,15 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
   isDark,
   comments = [],
   pendingComment,
+  editingCommentId,
   selectedLines,
   onAddComment,
   onSubmitComment,
   onCancelComment,
-  onDeleteComment
+  onUpdateComment,
+  onDeleteComment,
+  onStartEditComment,
+  onStopEditComment
 }: PreloadedDiffViewerProps) {
   const totalLines = useMemo(
     () => countLines(oldFile.contents) + countLines(newFile.contents),
@@ -334,7 +346,23 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
       );
     }
 
-    return <CommentDisplay comment={annotation.metadata.comment} onDelete={onDeleteComment} />;
+    const c = annotation.metadata.comment;
+    return (
+      <CommentDisplay
+        comment={c}
+        isEditing={editingCommentId === c.id}
+        onStartEdit={
+          onStartEditComment
+            ? () => {
+                onStartEditComment(c.id);
+              }
+            : undefined
+        }
+        onStopEdit={onStopEditComment}
+        onUpdate={onUpdateComment}
+        onDelete={onDeleteComment}
+      />
+    );
   };
 
   const renderHoverUtility = (
@@ -469,11 +497,15 @@ export function DiffViewer({
   diffStyle = 'split',
   comments,
   pendingComment,
+  editingCommentId,
   selectedLines,
   onAddComment,
   onSubmitComment,
   onCancelComment,
-  onDeleteComment
+  onUpdateComment,
+  onDeleteComment,
+  onStartEditComment,
+  onStopEditComment
 }: DiffViewerProps) {
   if (isLoading) return <LoadingState />;
   if (error !== null) return <ErrorState message={error} onRetry={onRetry} />;
@@ -494,11 +526,15 @@ export function DiffViewer({
       isDark={isDark}
       comments={comments}
       pendingComment={pendingComment}
+      editingCommentId={editingCommentId}
       selectedLines={selectedLines}
       onAddComment={onAddComment}
       onSubmitComment={onSubmitComment}
       onCancelComment={onCancelComment}
+      onUpdateComment={onUpdateComment}
       onDeleteComment={onDeleteComment}
+      onStartEditComment={onStartEditComment}
+      onStopEditComment={onStopEditComment}
     />
   );
 }

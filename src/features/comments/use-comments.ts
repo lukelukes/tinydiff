@@ -18,6 +18,7 @@ type CommentsState =
 export function useComments(repoPath: string) {
   const [state, setState] = useState<CommentsState>({ status: 'loading' });
   const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setState({ status: 'loading' });
@@ -34,6 +35,10 @@ export function useComments(repoPath: string) {
     void refresh();
   }, [refresh]);
 
+  const closeCommentForm = useCallback(() => {
+    setPendingComment(null);
+  }, []);
+
   const saveComment = useCallback(
     async (comment: Comment, fileContents: string | null) => {
       const result = await commands.saveComment(repoPath, comment, fileContents);
@@ -44,6 +49,34 @@ export function useComments(repoPath: string) {
       return { success: false as const, error: result.error };
     },
     [repoPath, refresh]
+  );
+
+  const updateComment = useCallback(
+    async (comment: Comment, fileContents: string | null) => {
+      let previousState: CommentsState | null = null;
+
+      setState((prev) => {
+        previousState = prev;
+        return prev.status === 'success'
+          ? {
+              ...prev,
+              data: {
+                comments: prev.data.comments.map((c) => (c.id === comment.id ? comment : c))
+              }
+            }
+          : prev;
+      });
+
+      const result = await commands.saveComment(repoPath, comment, fileContents);
+      if (result.status !== 'ok') {
+        if (previousState) {
+          setState(previousState);
+        }
+        return { success: false as const, error: result.error };
+      }
+      return { success: true as const };
+    },
+    [repoPath]
   );
 
   const deleteComment = useCallback(
@@ -65,18 +98,30 @@ export function useComments(repoPath: string) {
     []
   );
 
-  const closeCommentForm = useCallback(() => {
-    setPendingComment(null);
+  const startEditing = useCallback(
+    (id: string) => {
+      closeCommentForm();
+      setEditingCommentId(id);
+    },
+    [closeCommentForm]
+  );
+
+  const stopEditing = useCallback(() => {
+    setEditingCommentId(null);
   }, []);
 
   return {
     state,
     pendingComment,
+    editingCommentId,
     refresh,
     saveComment,
+    updateComment,
     deleteComment,
     openCommentForm,
-    closeCommentForm
+    closeCommentForm,
+    startEditing,
+    stopEditing
   };
 }
 

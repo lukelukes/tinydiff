@@ -128,10 +128,14 @@ function GitMode({ path }: { path: string }) {
   const {
     state: commentsState,
     pendingComment,
+    editingCommentId,
     saveComment,
+    updateComment,
     deleteComment,
     openCommentForm,
-    closeCommentForm
+    closeCommentForm,
+    startEditing,
+    stopEditing
   } = useComments(path);
 
   const [selectedLines, setSelectedLines] = useState<SelectedLineRange | null>(null);
@@ -204,6 +208,19 @@ function GitMode({ path }: { path: string }) {
   const handleCancelComment = () => {
     closeCommentForm();
     setSelectedLines(null);
+  };
+
+  const handleUpdateComment = async (comment: Comment) => {
+    const newFileContent =
+      fileContentsState.status === 'success' &&
+      fileContentsState.data.newFile.content?.type === 'text'
+        ? fileContentsState.data.newFile.content.contents
+        : null;
+
+    const result = await updateComment(comment, newFileContent);
+    if (!result.success) {
+      console.error('Failed to update comment:', result.error);
+    }
   };
 
   const handleDeleteComment = async (commentId: string) => {
@@ -355,11 +372,15 @@ function GitMode({ path }: { path: string }) {
             diffStyle={diffStyle}
             comments={fileComments}
             pendingComment={pendingComment}
+            editingCommentId={editingCommentId}
             selectedLines={selectedLines}
             onAddComment={handleAddComment}
             onSubmitComment={handleSubmitComment}
             onCancelComment={handleCancelComment}
+            onUpdateComment={handleUpdateComment}
             onDeleteComment={handleDeleteComment}
+            onStartEditComment={startEditing}
+            onStopEditComment={stopEditing}
           />
         </div>
       </SidebarInset>
