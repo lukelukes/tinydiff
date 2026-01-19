@@ -2,24 +2,15 @@ import type { HtmlTagDescriptor, Plugin } from 'vite';
 
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { defineConfig } from 'vite';
 
 const host = process.env.TAURI_DEV_HOST;
 const profilingEnabled = !!process.env.PROFILING_ENABLED;
+const isBrowserDev = !process.env.TAURI_ENV_PLATFORM;
 
 function devScripts(): Plugin {
   return {
     name: 'dev-scripts',
-    configureServer(server) {
-      server.middlewares.use('/tauri-mock.js', (_req, res) => {
-        const filePath = join(import.meta.dirname, 'dev', 'tauri-mock.js');
-        const content = readFileSync(filePath, 'utf-8');
-        res.setHeader('Content-Type', 'application/javascript');
-        res.end(content);
-      });
-    },
     transformIndexHtml: {
       order: 'pre',
       handler(_html, ctx) {
@@ -27,9 +18,15 @@ function devScripts(): Plugin {
           return [];
         }
 
-        const scripts: HtmlTagDescriptor[] = [
-          { tag: 'script', attrs: { src: '/tauri-mock.js' }, injectTo: 'body' }
-        ];
+        const scripts: HtmlTagDescriptor[] = [];
+
+        if (isBrowserDev) {
+          scripts.push({
+            tag: 'script',
+            attrs: { type: 'module', src: '/dev/tauri-mock.ts' },
+            injectTo: 'head'
+          });
+        }
 
         if (profilingEnabled) {
           scripts.push({
