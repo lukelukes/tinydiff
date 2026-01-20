@@ -58,3 +58,9 @@ repos:
         types_or: [ts, tsx]
         pass_filenames: false
         stages: [pre-push]
+
+      - id: conventional-commit
+        name: conventional commit
+        entry: scripts/check-commit-msg.sh
+        language: script
+        stages: [commit-msg]
