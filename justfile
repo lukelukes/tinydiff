@@ -1,4 +1,4 @@
-mod cargo 'src-tauri/justfile'
+mod cargo 'crates/tinydiff-tauri/justfile'
 
 help:
     just --list

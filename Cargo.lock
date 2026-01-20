@@ -4213,12 +4213,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "tinydiff"
+name = "tinydiff-core"
+version = "0.1.0"
+dependencies = [
+ "fs2",
+ "git2",
+ "serde",
+ "serde_json",
+ "specta",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
+name = "tinydiff-tauri"
 version = "0.1.0"
 dependencies = [
  "clap",
- "fs2",
- "git2",
  "proptest",
  "serde",
  "serde_json",
@@ -4232,20 +4244,7 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "tinydiff-core"
-version = "0.1.0"
-dependencies = [
- "fs2",
- "git2",
- "serde",
- "serde_json",
- "specta",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
+ "tinydiff-core",
 ]
 
 [[package]]

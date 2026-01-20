@@ -1,5 +1,5 @@
 [package]
-name = "tinydiff"
+name = "tinydiff-tauri"
 version = "0.1.0"
 description = "A tiny diff viewer"
 authors = ["you"]
@@ -14,14 +14,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.3", features = [] }
 
 [dependencies]
+tinydiff-core = { path = "../tinydiff-core", features = ["specta"] }
 tauri = { version = "2.9.5", features = [] }
 tauri-plugin-opener = "2.5.2"
 tauri-plugin-store = "2.4.2"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
-fs2 = "0.4.3"
 thiserror = "2.0.17"
-git2 = "0.20.3"
 clap = { version = "4.5.54", features = ["derive"] }
 specta = { version = "=2.0.0-rc.22", features = ["derive"] }
 tauri-specta = { version = "=2.0.0-rc.21", features = ["derive", "typescript"] }

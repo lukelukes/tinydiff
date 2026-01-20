@@ -39,8 +39,12 @@ fn write_collection(repo_path: &Path, collection: &CommentCollection) -> Result<
     let file_path = comments_file_path(repo_path);
     let temp_path = dir_path.join("comments.json.tmp");
 
-    let contents = serde_json::to_string_pretty(collection)
-        .map_err(|e| CoreError::io(&file_path, std::io::Error::new(std::io::ErrorKind::InvalidData, e)))?;
+    let contents = serde_json::to_string_pretty(collection).map_err(|e| {
+        CoreError::io(
+            &file_path,
+            std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+        )
+    })?;
     fs::write(&temp_path, &contents).map_err(|e| CoreError::io(&temp_path, e))?;
     if let Err(e) = fs::rename(&temp_path, &file_path) {
         let _ = fs::remove_file(&temp_path);
@@ -56,8 +60,12 @@ pub fn load_comments(repo_path: &Path) -> Result<CommentCollection, CoreError> {
         return Ok(CommentCollection::default());
     }
     let contents = fs::read_to_string(&path).map_err(|e| CoreError::io(&path, e))?;
-    serde_json::from_str(&contents)
-        .map_err(|e| CoreError::io(&path, std::io::Error::new(std::io::ErrorKind::InvalidData, e)))
+    serde_json::from_str(&contents).map_err(|e| {
+        CoreError::io(
+            &path,
+            std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+        )
+    })
 }
 
 pub fn save_comment(

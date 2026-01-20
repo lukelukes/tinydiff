@@ -85,55 +85,20 @@ async getCommentsForFile(repoPath: string, filePath: string, fileContents: strin
 /** user-defined types **/
 
 export type AppMode = { type: "empty" } | { type: "git"; path: string } | { type: "file"; fileA: string; fileB: string }
-/**
- * Serializable error type for Tauri commands.
- * Converts AppError variants to a format that can cross the IPC boundary.
- */
 export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; path: string; message: string }
 export type Comment = { id: string; filePath: string; lineNumber: number; body: string; resolved: boolean; createdAt: number; updatedAt: number; contextWindow?: string | null; unanchored?: boolean }
 export type CommentCollection = { comments: Comment[] }
-/**
- * A file version for diff rendering
- */
-export type DiffFile = { name: string; lang: string | null;
-/**
- * None = file doesn't exist in this version
- */
-content: FileContent | null }
-/**
- * A hunk (section) of a diff
- */
+export type DiffFile = { name: string; lang: string | null; content: FileContent | null }
 export type DiffHunk = { oldStart: number; oldLines: number; newStart: number; newLines: number; header: string; lines: DiffLine[] }
-/**
- * A single line in a diff
- */
 export type DiffLine = { changeType: LineChangeType; content: string; oldLineNo: number | null; newLineNo: number | null }
-/**
- * Whether to get staged or unstaged changes
- */
 export type DiffTarget = "staged" | "unstaged"
-/**
- * Content of a file - either readable text or opaque binary
- */
 export type FileContent = { type: "text"; contents: string } | { type: "binary"; size: number }
-/**
- * Complete diff for a single file
- */
 export type FileDiff = { path: string; oldPath: string | null; hunks: DiffHunk[]; isBinary: boolean }
 export type FileEntry = { path: string; status: FileStatus; oldPath: string | null }
 export type FileStatus = "added" | "modified" | "deleted" | "renamed" | "untracked" | "typechange" | "conflicted"
-/**
- * Result of getting file contents for diff
- */
 export type GitFileContents = { oldFile: DiffFile; newFile: DiffFile }
 export type GitStatus = { staged: FileEntry[]; unstaged: FileEntry[]; untracked: FileEntry[] }
-/**
- * Type of change for a diff line
- */
 export type LineChangeType = "context" | "addition" | "deletion"
-/**
- * Result of reading a file from the filesystem
- */
 export type ReadFileResult = { name: string; contents: string; lang: string | null; isBinary: boolean }
 
 /** tauri-specta globals **/

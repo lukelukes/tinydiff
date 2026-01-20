@@ -339,9 +339,9 @@ fn get_git_file_contents_with_repo(
                 .get_path(Path::new(file_path), 0)
                 .and_then(|entry| repo.find_blob(entry.id).ok());
 
-            let workdir = repo
-                .workdir()
-                .ok_or_else(|| CoreError::InvalidPath("Repository has no working directory".into()))?;
+            let workdir = repo.workdir().ok_or_else(|| {
+                CoreError::InvalidPath("Repository has no working directory".into())
+            })?;
             let full_path = workdir.join(file_path);
             let workdir_content = match std::fs::read(&full_path) {
                 Ok(bytes) => Some(bytes_to_content(&bytes)),
@@ -552,7 +552,8 @@ mod tests {
         index.add_path(Path::new("new.ts")).unwrap();
         index.write().unwrap();
 
-        let contents = get_git_file_contents(temp_dir.path(), "new.ts", DiffTarget::Staged).unwrap();
+        let contents =
+            get_git_file_contents(temp_dir.path(), "new.ts", DiffTarget::Staged).unwrap();
 
         assert!(contents.old_file.content.is_none());
         assert_eq!(

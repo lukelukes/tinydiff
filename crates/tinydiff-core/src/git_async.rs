@@ -48,7 +48,9 @@ mod tests {
 
         fs::write(temp_dir.path().join("new_file.txt"), "content").unwrap();
 
-        let status = get_status_async(temp_dir.path().to_path_buf()).await.unwrap();
+        let status = get_status_async(temp_dir.path().to_path_buf())
+            .await
+            .unwrap();
         assert_eq!(status.untracked.len(), 1);
         assert_eq!(status.untracked[0].path, "new_file.txt");
     }
