@@ -1,0 +1,13 @@
+[package]
+name = "tinydiff-gpui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.92.0"
+
+[[bin]]
+name = "tinydiff-gpui"
+path = "src/main.rs"
+
+[dependencies]
+tinydiff-core = { path = "../tinydiff-core" }
+gpui = "0.2.2"

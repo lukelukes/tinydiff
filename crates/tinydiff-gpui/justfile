@@ -1,0 +1,14 @@
+fmt:
+    cargo fmt -p tinydiff-gpui
+
+dev:
+    cargo run -p tinydiff-gpui
+
+build:
+    cargo build -p tinydiff-gpui --release
+
+check:
+    cargo check -p tinydiff-gpui
+
+clippy:
+    cargo clippy -p tinydiff-gpui -- -D warnings
