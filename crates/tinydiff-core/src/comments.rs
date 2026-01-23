@@ -11,7 +11,7 @@ fn comments_file_path(repo_path: &Path) -> std::path::PathBuf {
 fn validate_file_path(file_path: &str) -> Result<(), CoreError> {
     if file_path.contains("..") || Path::new(file_path).is_absolute() {
         return Err(CoreError::InvalidPath(
-            "Invalid file path: must be relative and cannot contain '..'".to_string(),
+            "Invalid file path: must be relative and cannot contain '..'".to_owned(),
         ));
     }
     Ok(())
@@ -25,7 +25,7 @@ fn build_context_window(lines: &[&str], line_idx: usize) -> String {
     };
     let target = lines.get(line_idx).copied().unwrap_or("");
     let after = lines.get(line_idx + 1).copied().unwrap_or("");
-    format!("{}\n{}\n{}", before, target, after)
+    format!("{before}\n{target}\n{after}")
 }
 
 fn extract_context_window(file_contents: &str, line_number: u32) -> String {
@@ -135,9 +135,8 @@ pub fn delete_comment(repo_path: &Path, comment_id: &str) -> Result<bool, CoreEr
 }
 
 pub fn re_anchor_comment(comment: &mut Comment, file_contents: &str) {
-    let stored_context = match &comment.context_window {
-        Some(ctx) => ctx,
-        None => return,
+    let Some(stored_context) = &comment.context_window else {
+        return;
     };
 
     let lines: Vec<&str> = file_contents.lines().collect();
@@ -145,7 +144,7 @@ pub fn re_anchor_comment(comment: &mut Comment, file_contents: &str) {
     for (idx, _) in lines.iter().enumerate() {
         let window = build_context_window(&lines, idx);
         if window == *stored_context {
-            comment.line_number = (idx + 1) as u32;
+            comment.line_number = u32::try_from(idx + 1).unwrap_or(u32::MAX);
             comment.unanchored = false;
             return;
         }

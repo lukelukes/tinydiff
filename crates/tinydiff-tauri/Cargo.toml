@@ -6,6 +6,9 @@ authors = ["you"]
 edition = "2024"
 rust-version = "1.92.0"
 
+[lints]
+workspace = true
+
 [lib]
 name = "tinydiff_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

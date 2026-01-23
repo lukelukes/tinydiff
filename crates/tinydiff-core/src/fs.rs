@@ -35,8 +35,7 @@ pub fn extension_to_lang(path: &str) -> Option<String> {
         "less" => "less",
         "json" => "json",
         "jsonc" => "jsonc",
-        "xml" => "xml",
-        "svg" => "xml",
+        "xml" | "svg" => "xml",
         "yaml" | "yml" => "yaml",
         "toml" => "toml",
         "rs" => "rust",
@@ -82,7 +81,7 @@ pub fn extension_to_lang(path: &str) -> Option<String> {
         _ => return None,
     };
 
-    Some(lang.to_string())
+    Some(lang.to_owned())
 }
 
 const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024;
@@ -117,7 +116,7 @@ pub fn read_file(file_path: &Path) -> Result<ReadFileResult, CoreError> {
         .file_name()
         .and_then(|n| n.to_str())
         .unwrap_or("")
-        .to_string();
+        .to_owned();
 
     let path_str = file_path.to_string_lossy();
     let lang = extension_to_lang(&path_str);

@@ -1,3 +1,5 @@
+#![allow(clippy::needless_pass_by_value)]
+
 use clap::{CommandFactory, Parser, error::ErrorKind};
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -79,7 +81,7 @@ impl From<AppError> for CommandError {
             },
             AppError::InvalidArgCount { .. } => CommandError::Path {
                 path: String::new(),
-                message: "Invalid argument count".to_string(),
+                message: "Invalid argument count".to_owned(),
             },
         }
     }
@@ -88,10 +90,6 @@ impl From<AppError> for CommandError {
 impl From<CoreError> for CommandError {
     fn from(err: CoreError) -> Self {
         match &err {
-            CoreError::Git(_) => CommandError::Git {
-                path: String::new(),
-                message: err.to_string(),
-            },
             CoreError::Io { path, .. } => CommandError::Path {
                 path: path.display().to_string(),
                 message: err.to_string(),
@@ -100,7 +98,7 @@ impl From<CoreError> for CommandError {
                 path: String::new(),
                 message: msg.clone(),
             },
-            CoreError::TaskPanic(_) => CommandError::Git {
+            CoreError::Git(_) | CoreError::TaskPanic(_) => CommandError::Git {
                 path: String::new(),
                 message: err.to_string(),
             },
@@ -123,25 +121,25 @@ pub fn parse_app_mode() -> Result<AppMode, AppError> {
 }
 
 pub fn parse_app_mode_from_args(args: Args) -> Result<AppMode, AppError> {
-    match args.paths.len() {
-        0 => Ok(AppMode::Empty),
-        1 => {
-            let path = canonicalize_path(args.paths.into_iter().next().unwrap())?;
+    let mut iter = args.paths.into_iter();
+    match (iter.next(), iter.next(), iter.next()) {
+        (None, _, _) => Ok(AppMode::Empty),
+        (Some(p), None, _) => {
+            let path = canonicalize_path(p)?;
             tinydiff_core::discover_repository(&path)?;
             Ok(AppMode::Git {
                 path: path_to_string(&path)?,
             })
         }
-        2 => {
-            let mut iter = args.paths.into_iter();
-            let file_a = canonicalize_path(iter.next().unwrap())?;
-            let file_b = canonicalize_path(iter.next().unwrap())?;
+        (Some(a), Some(b), None) => {
+            let file_a = canonicalize_path(a)?;
+            let file_b = canonicalize_path(b)?;
             Ok(AppMode::File {
                 file_a: path_to_string(&file_a)?,
                 file_b: path_to_string(&file_b)?,
             })
         }
-        n => Err(AppError::InvalidArgCount(n)),
+        _ => Err(AppError::InvalidArgCount(iter.count() + 3)),
     }
 }
 
@@ -168,7 +166,7 @@ fn get_file_diff(
     if file_path.contains("..") || Path::new(&file_path).is_absolute() {
         return Err(CommandError::Git {
             path: file_path,
-            message: "Invalid file path".to_string(),
+            message: "Invalid file path".to_owned(),
         });
     }
     let path_buf = PathBuf::from(&repo_path);
@@ -199,7 +197,7 @@ fn read_file(
         _ => {
             return Err(CommandError::Path {
                 path: file_path,
-                message: "read_file is only available in file comparison mode".to_string(),
+                message: "read_file is only available in file comparison mode".to_owned(),
             });
         }
     };
@@ -207,7 +205,7 @@ fn read_file(
     if file_path != allowed_a && file_path != allowed_b {
         return Err(CommandError::Path {
             path: file_path,
-            message: "Access denied: path not in allowed file list".to_string(),
+            message: "Access denied: path not in allowed file list".to_owned(),
         });
     }
 
@@ -219,7 +217,7 @@ fn validate_repo_path(repo_path: &Path) -> Result<(), CommandError> {
     if !repo_path.is_dir() {
         return Err(CommandError::Path {
             path: repo_path.display().to_string(),
-            message: "Path does not exist or is not a directory".to_string(),
+            message: "Path does not exist or is not a directory".to_owned(),
         });
     }
     Ok(())
@@ -274,6 +272,7 @@ fn get_comments_for_file(
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[allow(clippy::expect_used)]
 pub fn run() {
     let app_mode = parse_app_mode().unwrap_or_else(|e| {
         let kind = match &e {

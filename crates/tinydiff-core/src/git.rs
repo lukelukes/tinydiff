@@ -94,7 +94,7 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
     let mut untracked = Vec::new();
 
     for entry in statuses.iter() {
-        let default_path = entry.path().unwrap_or("").to_string();
+        let default_path = entry.path().unwrap_or("").to_owned();
         let status = entry.status();
 
         if let Some(file_status) = status_to_file_status(status, true) {
@@ -103,8 +103,7 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
                 let new_path = diff_delta
                     .as_ref()
                     .and_then(|d| d.new_file().path())
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_else(|| default_path.clone());
+                    .map_or_else(|| default_path.clone(), |p| p.to_string_lossy().into_owned());
                 let old = diff_delta
                     .and_then(|d| d.old_file().path())
                     .map(|p| p.to_string_lossy().into_owned());
@@ -133,8 +132,7 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
                     let new_path = diff_delta
                         .as_ref()
                         .and_then(|d| d.new_file().path())
-                        .map(|p| p.to_string_lossy().into_owned())
-                        .unwrap_or_else(|| default_path.clone());
+                        .map_or_else(|| default_path.clone(), |p| p.to_string_lossy().into_owned());
                     let old = diff_delta
                         .and_then(|d| d.old_file().path())
                         .map(|p| p.to_string_lossy().into_owned());
@@ -189,7 +187,7 @@ fn get_file_diff_with_repo(
 
     let hunks: RefCell<Vec<DiffHunk>> = RefCell::new(Vec::new());
     let is_binary: RefCell<bool> = RefCell::new(false);
-    let actual_path: RefCell<String> = RefCell::new(file_path.to_string());
+    let actual_path: RefCell<String> = RefCell::new(file_path.to_owned());
     let old_path: RefCell<Option<String>> = RefCell::new(None);
 
     diff.print(git2::DiffFormat::Patch, |delta, hunk, line| {
@@ -212,13 +210,12 @@ fn get_file_diff_with_repo(
             let mut hunks_ref = hunks.borrow_mut();
             let needs_new_hunk = hunks_ref
                 .last()
-                .map(|last| {
+                .is_none_or(|last| {
                     last.old_start != h.old_start()
                         || last.new_start != h.new_start()
                         || last.old_lines != h.old_lines()
                         || last.new_lines != h.new_lines()
-                })
-                .unwrap_or(true);
+                });
 
             if needs_new_hunk {
                 hunks_ref.push(DiffHunk {
@@ -226,7 +223,7 @@ fn get_file_diff_with_repo(
                     old_lines: h.old_lines(),
                     new_start: h.new_start(),
                     new_lines: h.new_lines(),
-                    header: String::from_utf8_lossy(h.header()).trim_end().to_string(),
+                    header: String::from_utf8_lossy(h.header()).trim_end().to_owned(),
                     lines: Vec::new(),
                 });
             }
@@ -244,7 +241,7 @@ fn get_file_diff_with_repo(
 
         let content = String::from_utf8_lossy(line.content())
             .trim_end_matches('\n')
-            .to_string();
+            .to_owned();
 
         let mut hunks_ref = hunks.borrow_mut();
         if let Some(hunk) = hunks_ref.last_mut() {
@@ -284,7 +281,7 @@ fn get_git_file_contents_with_repo(
     let file_path_obj = Path::new(file_path);
     if file_path_obj.is_absolute() {
         return Err(CoreError::InvalidPath(
-            "Absolute paths are not allowed".to_string(),
+            "Absolute paths are not allowed".to_owned(),
         ));
     }
 
@@ -302,7 +299,7 @@ fn get_git_file_contents_with_repo(
             full_path
                 .parent()
                 .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "No parent"))
-                .and_then(|p| p.canonicalize())
+                .and_then(std::path::Path::canonicalize)
                 .map(|p| p.join(full_path.file_name().unwrap_or_default()))
         }
         .map_err(|e| CoreError::io(&full_path, e))?;
@@ -357,12 +354,12 @@ fn get_git_file_contents_with_repo(
 
     Ok(GitFileContents {
         old_file: DiffFile {
-            name: file_path.to_string(),
+            name: file_path.to_owned(),
             lang: lang.clone(),
             content: old_content,
         },
         new_file: DiffFile {
-            name: file_path.to_string(),
+            name: file_path.to_owned(),
             lang,
             content: new_content,
         },
