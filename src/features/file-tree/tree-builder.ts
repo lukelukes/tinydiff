@@ -1,15 +1,16 @@
 import type { CSSProperties } from 'react';
 
-import type { FileEntry, FileStatus, GitStatus } from '../../../tauri-bindings';
+import type { FileEntry, FileEntryKind, GitStatus } from '../../../tauri-bindings';
 
 export type TreeNodeType = 'file' | 'directory';
+
+type FileStatus = FileEntryKind['status'];
 
 export interface FileTreeNode {
   name: string;
   path: string;
   type: TreeNodeType;
-  status?: FileStatus;
-  oldPath?: string | null;
+  kind?: FileEntryKind;
   isStaged: boolean;
   children: FileTreeNode[];
 }
@@ -51,8 +52,7 @@ export function buildFileTree(status: GitStatus): FileTreeNode[] {
           name: part,
           path: file.path,
           type: 'file',
-          status: file.status,
-          oldPath: file.oldPath,
+          kind: file.kind,
           isStaged: file.isStaged,
           children: []
         });
@@ -110,6 +110,8 @@ export function getStatusLabel(status: FileStatus): string {
       return 'T';
     case 'conflicted':
       return 'C';
+    default:
+      return status satisfies never;
   }
 }
 
@@ -132,6 +134,8 @@ export function getStatusColorClass(status: FileStatus): string {
       return 'text-git-renamed';
     case 'conflicted':
       return 'text-git-conflicted';
+    default:
+      return status satisfies never;
   }
 }
 
@@ -154,5 +158,7 @@ export function getStatusStyles(status: FileStatus): CSSProperties {
       return { backgroundColor: 'var(--git-renamed-bg)', color: 'var(--git-renamed)' };
     case 'conflicted':
       return { backgroundColor: 'var(--git-conflicted-bg)', color: 'var(--git-conflicted)' };
+    default:
+      return status satisfies never;
   }
 }

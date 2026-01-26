@@ -1,5 +1,5 @@
 use crate::error::CoreError;
-use crate::types::{Comment, CommentCollection};
+use crate::types::{Comment, CommentAnchor, CommentCollection};
 use fs2::FileExt;
 use std::fs::{self, File};
 use std::path::Path;
@@ -75,11 +75,12 @@ pub fn save_comment(
 ) -> Result<(), CoreError> {
     validate_file_path(&comment.file_path)?;
 
+    let line = comment.anchor.line();
     if let Some(contents) = file_contents
-        && comment.line_number > 0
+        && line > 0
     {
-        comment.context_window = Some(extract_context_window(contents, comment.line_number));
-        comment.unanchored = false;
+        let context = extract_context_window(contents, line);
+        comment.anchor = CommentAnchor::Tracked { line, context };
     }
 
     let dir_path = repo_path.join(".tinydiff");
@@ -135,22 +136,30 @@ pub fn delete_comment(repo_path: &Path, comment_id: &str) -> Result<bool, CoreEr
 }
 
 pub fn re_anchor_comment(comment: &mut Comment, file_contents: &str) {
-    let Some(stored_context) = &comment.context_window else {
-        return;
+    let (current_line, context) = match &comment.anchor {
+        CommentAnchor::Pinned { .. } => return,
+        CommentAnchor::Tracked { line, context } => (*line, context.clone()),
+        CommentAnchor::Orphaned {
+            last_known_line,
+            context,
+        } => (*last_known_line, context.clone()),
     };
 
     let lines: Vec<&str> = file_contents.lines().collect();
 
     for (idx, _) in lines.iter().enumerate() {
         let window = build_context_window(&lines, idx);
-        if window == *stored_context {
-            comment.line_number = u32::try_from(idx + 1).unwrap_or(u32::MAX);
-            comment.unanchored = false;
+        if window == context {
+            let line = u32::try_from(idx + 1).unwrap_or(u32::MAX);
+            comment.anchor = CommentAnchor::Tracked { line, context };
             return;
         }
     }
 
-    comment.unanchored = true;
+    comment.anchor = CommentAnchor::Orphaned {
+        last_known_line: current_line,
+        context,
+    };
 }
 
 pub fn get_comments_for_file(
@@ -182,13 +191,11 @@ mod tests {
         Comment {
             id: id.to_string(),
             file_path: "test.rs".to_string(),
-            line_number: 10,
+            anchor: CommentAnchor::Pinned { line: 10 },
             body: body.to_string(),
             resolved: false,
             created_at: 1000,
             updated_at: 1000,
-            context_window: None,
-            unanchored: false,
         }
     }
 
@@ -299,14 +306,13 @@ mod tests {
         let context = extract_context_window(original_contents, 2);
 
         let mut comment = make_comment("c1", "test");
-        comment.line_number = 2;
-        comment.context_window = Some(context);
+        comment.anchor = CommentAnchor::Tracked { line: 2, context };
 
         let new_contents = "new_line\nalpha\nbeta\ngamma";
         re_anchor_comment(&mut comment, new_contents);
 
-        assert_eq!(comment.line_number, 3);
-        assert!(!comment.unanchored);
+        assert_eq!(comment.anchor.line(), 3);
+        assert!(!comment.anchor.is_orphaned());
     }
 
     #[test]
@@ -315,27 +321,25 @@ mod tests {
         let context = extract_context_window(original_contents, 2);
 
         let mut comment = make_comment("c1", "test");
-        comment.line_number = 2;
-        comment.context_window = Some(context);
+        comment.anchor = CommentAnchor::Tracked { line: 2, context };
 
         let new_contents = "completely\ndifferent\ncontent";
         re_anchor_comment(&mut comment, new_contents);
 
-        assert_eq!(comment.line_number, 2);
-        assert!(comment.unanchored);
+        assert_eq!(comment.anchor.line(), 2);
+        assert!(comment.anchor.is_orphaned());
     }
 
     #[test]
-    fn test_re_anchor_no_context_noop() {
+    fn test_re_anchor_pinned_noop() {
         let mut comment = make_comment("c1", "test");
-        comment.line_number = 5;
-        comment.context_window = None;
+        comment.anchor = CommentAnchor::Pinned { line: 5 };
 
         let contents = "some\nfile\ncontents";
         re_anchor_comment(&mut comment, contents);
 
-        assert_eq!(comment.line_number, 5);
-        assert!(!comment.unanchored);
+        assert_eq!(comment.anchor.line(), 5);
+        assert!(!comment.anchor.is_orphaned());
     }
 
     #[test]
@@ -345,14 +349,13 @@ mod tests {
 
         let file_contents = "line1\nline2\nline3\nline4";
         let mut comment = make_comment("c1", "test");
-        comment.line_number = 2;
+        comment.anchor = CommentAnchor::Pinned { line: 2 };
 
         save_comment(repo_path, comment, Some(file_contents)).unwrap();
         let loaded = load_comments(repo_path).unwrap();
 
-        assert!(loaded.comments[0].context_window.is_some());
         assert_eq!(
-            loaded.comments[0].context_window.as_deref(),
+            loaded.comments[0].anchor.context(),
             Some("line1\nline2\nline3")
         );
     }

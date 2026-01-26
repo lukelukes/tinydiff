@@ -311,9 +311,11 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     const annotations: DiffLineAnnotation<AnnotationMetadata>[] = [];
 
     for (const comment of comments) {
+      const line =
+        comment.anchor.type === 'orphaned' ? comment.anchor.last_known_line : comment.anchor.line;
       annotations.push({
         side: 'additions',
-        lineNumber: comment.lineNumber,
+        lineNumber: line,
         metadata: { type: 'comment', comment }
       });
     }

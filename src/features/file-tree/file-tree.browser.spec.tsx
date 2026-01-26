@@ -11,10 +11,10 @@ function createStatus(files: { path: string; staged?: boolean }[]): GitStatus {
   return {
     staged: files
       .filter((f) => f.staged === true)
-      .map((f) => ({ path: f.path, status: 'modified' as const, oldPath: null })),
+      .map((f) => ({ path: f.path, kind: { status: 'modified' as const } })),
     unstaged: files
       .filter((f) => f.staged !== true)
-      .map((f) => ({ path: f.path, status: 'modified' as const, oldPath: null })),
+      .map((f) => ({ path: f.path, kind: { status: 'modified' as const } })),
     untracked: []
   };
 }

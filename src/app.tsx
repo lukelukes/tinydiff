@@ -201,7 +201,7 @@ function GitMode({ path }: { path: string }) {
     const comment: Comment = {
       id: generateCommentId(),
       filePath: selectedFile,
-      lineNumber,
+      anchor: { type: 'pinned', line: lineNumber },
       body,
       resolved: false,
       createdAt: Math.floor(Date.now() / 1000),

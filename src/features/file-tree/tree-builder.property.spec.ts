@@ -32,8 +32,7 @@ function createGitStatus(paths: string[]): GitStatus {
     staged: [],
     unstaged: paths.map((path) => ({
       path,
-      status: 'modified' as const,
-      oldPath: null
+      kind: { status: 'modified' as const }
     })),
     untracked: []
   };

@@ -124,14 +124,14 @@ function TreeItem({
             className="shrink-0 text-muted-foreground group-hover/file:text-muted-foreground transition-colors"
           />
           <span className="flex-1 truncate text-sm">{node.name}</span>
-          {node.status && (
+          {node.kind && (
             <span
               className="ml-2 shrink-0 text-2xs font-semibold"
               style={{
-                color: `var(--git-${node.status === 'typechange' ? 'renamed' : node.status})`
+                color: `var(--git-${node.kind.status === 'typechange' ? 'renamed' : node.kind.status})`
               }}
             >
-              {getStatusLabel(node.status)}
+              {getStatusLabel(node.kind.status)}
             </span>
           )}
         </SidebarMenuButton>

@@ -239,7 +239,9 @@ export function CommentDisplay({
         'group bg-card border rounded-lg p-4 my-3 mx-5 shadow-subtle max-w-[min(100%,600px)] transition-colors',
         isEditing && 'ring-2 ring-primary/50',
         comment.resolved && 'border-l-2 border-l-git-added',
-        comment.unanchored ? 'border-dashed border-git-modified/70' : 'border-border'
+        comment.anchor.type === 'orphaned'
+          ? 'border-dashed border-git-modified/70'
+          : 'border-border'
       )}
       onKeyDown={handleKeyDown}
     >
@@ -252,7 +254,7 @@ export function CommentDisplay({
         />
       ) : (
         <>
-          {comment.unanchored && comment.contextWindow && (
+          {comment.anchor.type === 'orphaned' && (
             <div
               role="region"
               className="mb-3 text-xs font-mono bg-git-modified-bg rounded p-2"
@@ -260,7 +262,7 @@ export function CommentDisplay({
             >
               <p className="text-git-modified text-xs mb-1 font-sans">Original context:</p>
               <pre className="whitespace-pre-wrap break-words text-muted-foreground">
-                {comment.contextWindow}
+                {comment.anchor.context}
               </pre>
             </div>
           )}
@@ -278,7 +280,9 @@ export function CommentDisplay({
               {formatRelativeTime(comment.createdAt)}
               {isEdited && <span className="ml-1">(edited)</span>}
               {comment.resolved && <span className="ml-1">(resolved)</span>}
-              {comment.unanchored && <span className="ml-1 text-git-modified">(unanchored)</span>}
+              {comment.anchor.type === 'orphaned' && (
+                <span className="ml-1 text-git-modified">(orphaned)</span>
+              )}
             </p>
 
             <div

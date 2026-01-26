@@ -33,6 +33,7 @@ repos:
         language: system
         types_or: [ts, tsx, javascript, jsx]
         pass_filenames: false
+        args: [--no-error-on-unmatched-pattern]
         stages: [pre-commit]
 
       - id: oxlint

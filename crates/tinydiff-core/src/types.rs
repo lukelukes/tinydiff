@@ -115,20 +115,58 @@ pub struct GitFileContents {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(Type))]
+pub enum CommentAnchor {
+    Pinned {
+        line: u32,
+    },
+    Tracked {
+        line: u32,
+        context: String,
+    },
+    Orphaned {
+        last_known_line: u32,
+        context: String,
+    },
+}
+
+impl CommentAnchor {
+    #[must_use]
+    pub fn line(&self) -> u32 {
+        match self {
+            Self::Pinned { line } | Self::Tracked { line, .. } => *line,
+            Self::Orphaned {
+                last_known_line, ..
+            } => *last_known_line,
+        }
+    }
+
+    #[must_use]
+    pub fn context(&self) -> Option<&str> {
+        match self {
+            Self::Pinned { .. } => None,
+            Self::Tracked { context, .. } | Self::Orphaned { context, .. } => Some(context),
+        }
+    }
+
+    #[must_use]
+    pub fn is_orphaned(&self) -> bool {
+        matches!(self, Self::Orphaned { .. })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
 #[serde(rename_all = "camelCase")]
 pub struct Comment {
     pub id: String,
     pub file_path: String,
-    pub line_number: u32,
+    pub anchor: CommentAnchor,
     pub body: String,
     pub resolved: bool,
     pub created_at: i64,
     pub updated_at: i64,
-    #[serde(default)]
-    pub context_window: Option<String>,
-    #[serde(default)]
-    pub unanchored: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
