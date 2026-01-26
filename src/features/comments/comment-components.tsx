@@ -12,6 +12,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Comment } from '../../../tauri-bindings';
 
 import { Button } from '../components/ui/button';
+
+type CommentOperation =
+  | { type: 'idle' }
+  | { type: 'confirmingDelete' }
+  | { type: 'deleting' }
+  | { type: 'updating' };
 import { formatRelativeTime } from './use-comments';
 
 interface CommentTextareaProps {
@@ -137,80 +143,65 @@ export function CommentDisplay({
   onUpdate,
   onDelete
 }: CommentDisplayProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const confirmTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [operation, setOperation] = useState<CommentOperation>({ type: 'idle' });
   const editButtonRef = useRef<HTMLButtonElement>(null);
 
   const isEdited = comment.updatedAt !== comment.createdAt;
-  const isOperationPending = isDeleting || isUpdating;
+  const isOperationPending = operation.type === 'deleting' || operation.type === 'updating';
 
   useEffect(() => {
+    if (operation.type !== 'confirmingDelete') return;
+    const timeout = setTimeout(() => {
+      setOperation({ type: 'idle' });
+    }, 2000);
     return () => {
-      if (confirmTimeoutRef.current) {
-        clearTimeout(confirmTimeoutRef.current);
-      }
+      clearTimeout(timeout);
     };
-  }, []);
-
-  const cancelDeleteConfirmation = useCallback(() => {
-    if (confirmTimeoutRef.current) {
-      clearTimeout(confirmTimeoutRef.current);
-      confirmTimeoutRef.current = null;
-    }
-    setIsConfirmingDelete(false);
-  }, []);
+  }, [operation.type]);
 
   const handleDeleteClick = useCallback(async () => {
     if (!onDelete || isOperationPending) return;
-
-    if (!isConfirmingDelete) {
-      setIsConfirmingDelete(true);
-      confirmTimeoutRef.current = setTimeout(() => {
-        setIsConfirmingDelete(false);
-      }, 2000);
+    if (operation.type !== 'confirmingDelete') {
+      setOperation({ type: 'confirmingDelete' });
       return;
     }
-
-    cancelDeleteConfirmation();
-    setIsDeleting(true);
+    setOperation({ type: 'deleting' });
     try {
       await onDelete(comment.id);
-    } finally {
-      setIsDeleting(false);
+    } catch {
+      setOperation({ type: 'idle' });
     }
-  }, [comment.id, onDelete, isConfirmingDelete, isOperationPending, cancelDeleteConfirmation]);
+  }, [comment.id, onDelete, operation.type, isOperationPending]);
 
   const handleResolveToggle = useCallback(async () => {
     if (!onUpdate || isOperationPending) return;
-
-    setIsUpdating(true);
+    setOperation({ type: 'updating' });
     try {
       await onUpdate({
         ...comment,
         resolved: !comment.resolved,
         updatedAt: Math.floor(Date.now() / 1000)
       });
-    } finally {
-      setIsUpdating(false);
+      setOperation({ type: 'idle' });
+    } catch {
+      setOperation({ type: 'idle' });
     }
   }, [comment, onUpdate, isOperationPending]);
 
   const handleSaveEdit = useCallback(
     async (newBody: string) => {
       if (!onUpdate) return;
-
-      setIsUpdating(true);
+      setOperation({ type: 'updating' });
       try {
         await onUpdate({
           ...comment,
           body: newBody,
           updatedAt: Math.floor(Date.now() / 1000)
         });
+        setOperation({ type: 'idle' });
         onStopEdit?.();
-      } finally {
-        setIsUpdating(false);
+      } catch {
+        setOperation({ type: 'idle' });
       }
     },
     [comment, onUpdate, onStopEdit]
@@ -225,12 +216,12 @@ export function CommentDisplay({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape' && isConfirmingDelete) {
+      if (e.key === 'Escape' && operation.type === 'confirmingDelete') {
         e.preventDefault();
-        cancelDeleteConfirmation();
+        setOperation({ type: 'idle' });
       }
     },
-    [isConfirmingDelete, cancelDeleteConfirmation]
+    [operation.type]
   );
 
   return (
@@ -289,7 +280,7 @@ export function CommentDisplay({
               className={cn(
                 'flex items-center gap-1',
                 'opacity-0 group-hover:opacity-100 transition-opacity',
-                (isConfirmingDelete || isOperationPending) && 'opacity-100'
+                (operation.type === 'confirmingDelete' || isOperationPending) && 'opacity-100'
               )}
             >
               {onUpdate && (
@@ -304,10 +295,14 @@ export function CommentDisplay({
                   )}
                   aria-label={comment.resolved ? 'Mark as unresolved' : 'Mark as resolved'}
                 >
-                  <HugeiconsIcon
-                    icon={comment.resolved ? CheckmarkCircle02Icon : Tick02Icon}
-                    size={14}
-                  />
+                  {operation.type === 'updating' ? (
+                    <HugeiconsIcon icon={Loading02Icon} size={14} className="animate-spin" />
+                  ) : (
+                    <HugeiconsIcon
+                      icon={comment.resolved ? CheckmarkCircle02Icon : Tick02Icon}
+                      size={14}
+                    />
+                  )}
                 </button>
               )}
 
@@ -330,20 +325,24 @@ export function CommentDisplay({
               {onDelete && (
                 <button
                   onClick={() => void handleDeleteClick()}
-                  onBlur={cancelDeleteConfirmation}
-                  disabled={isDeleting}
+                  onBlur={() => {
+                    if (operation.type === 'confirmingDelete') setOperation({ type: 'idle' });
+                  }}
+                  disabled={operation.type === 'deleting'}
                   className={cn(
                     'flex items-center justify-center h-7 rounded-md px-1.5',
-                    isConfirmingDelete
+                    operation.type === 'confirmingDelete'
                       ? 'text-destructive bg-destructive/10'
                       : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10',
                     'disabled:opacity-50 disabled:cursor-not-allowed'
                   )}
-                  aria-label={isConfirmingDelete ? 'Confirm delete' : 'Delete comment'}
+                  aria-label={
+                    operation.type === 'confirmingDelete' ? 'Confirm delete' : 'Delete comment'
+                  }
                 >
-                  {isDeleting ? (
+                  {operation.type === 'deleting' ? (
                     <HugeiconsIcon icon={Loading02Icon} size={14} className="animate-spin" />
-                  ) : isConfirmingDelete ? (
+                  ) : operation.type === 'confirmingDelete' ? (
                     <span className="text-xs font-medium">Delete?</span>
                   ) : (
                     <HugeiconsIcon icon={Cancel01Icon} size={14} />
