@@ -1,8 +1,8 @@
 use crate::error::CoreError;
 use crate::fs::extension_to_lang;
 use crate::types::{
-    DiffFile, DiffHunk, DiffLine, DiffTarget, FileContent, FileDiff, FileEntry, FileEntryKind,
-    GitFileContents, GitStatus, LineChangeType,
+    DiffContent, DiffFile, DiffHunk, DiffLine, DiffTarget, FileContent, FileDiff, FileEntry,
+    FileEntryKind, GitFileContents, GitStatus, LineChangeType,
 };
 use git2::{DiffLineType, DiffOptions, Repository, Status, StatusOptions};
 use std::path::Path;
@@ -282,11 +282,18 @@ fn get_file_diff_with_repo(
         true
     })?;
 
+    let content = if is_binary.into_inner() {
+        DiffContent::Binary
+    } else {
+        DiffContent::Text {
+            hunks: hunks.into_inner(),
+        }
+    };
+
     Ok(FileDiff {
         path: actual_path.into_inner(),
         old_path: old_path.into_inner(),
-        hunks: hunks.into_inner(),
-        is_binary: is_binary.into_inner(),
+        content,
     })
 }
 
@@ -549,10 +556,12 @@ mod tests {
 
         let diff = get_file_diff(temp_dir.path(), "new.txt", DiffTarget::Staged).unwrap();
         assert_eq!(diff.path, "new.txt");
-        assert!(!diff.is_binary);
-        assert_eq!(diff.hunks.len(), 1);
+        assert!(matches!(&diff.content, DiffContent::Text { hunks } if hunks.len() == 1));
 
-        let hunk = &diff.hunks[0];
+        let DiffContent::Text { hunks } = &diff.content else {
+            unreachable!()
+        };
+        let hunk = &hunks[0];
         assert_eq!(hunk.old_start, 0);
         assert_eq!(hunk.new_start, 1);
         assert_eq!(hunk.lines.len(), 3);

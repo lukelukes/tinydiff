@@ -66,12 +66,19 @@ pub struct DiffHunk {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum DiffContent {
+    Text { hunks: Vec<DiffHunk> },
+    Binary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "specta", derive(Type))]
 #[serde(rename_all = "camelCase")]
 pub struct FileDiff {
     pub path: String,
     pub old_path: Option<String>,
-    pub hunks: Vec<DiffHunk>,
-    pub is_binary: bool,
+    pub content: DiffContent,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
