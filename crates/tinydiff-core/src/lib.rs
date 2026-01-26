@@ -16,5 +16,5 @@ pub use git::{
 pub use git_async::{get_file_diff_async, get_git_file_contents_async, get_status_async};
 pub use types::{
     Comment, CommentCollection, DiffFile, DiffHunk, DiffLine, DiffTarget, FileContent, FileDiff,
-    FileEntry, FileStatus, GitFileContents, GitStatus, LineChangeType, ReadFileResult,
+    FileEntry, FileEntryKind, GitFileContents, GitStatus, LineChangeType, ReadFileResult,
 };

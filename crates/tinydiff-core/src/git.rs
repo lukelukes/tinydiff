@@ -1,7 +1,7 @@
 use crate::error::CoreError;
 use crate::fs::extension_to_lang;
 use crate::types::{
-    DiffFile, DiffHunk, DiffLine, DiffTarget, FileContent, FileDiff, FileEntry, FileStatus,
+    DiffFile, DiffHunk, DiffLine, DiffTarget, FileContent, FileDiff, FileEntry, FileEntryKind,
     GitFileContents, GitStatus, LineChangeType,
 };
 use git2::{DiffLineType, DiffOptions, Repository, Status, StatusOptions};
@@ -15,35 +15,60 @@ pub fn discover_repository(path: &Path) -> Result<Repository, CoreError> {
     Repository::discover(path).map_err(CoreError::from)
 }
 
-fn status_to_file_status(status: Status, staged: bool) -> Option<FileStatus> {
+#[derive(Clone, Copy)]
+enum BasicStatus {
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    Untracked,
+    Typechange,
+    Conflicted,
+}
+
+fn status_to_basic(status: Status, staged: bool) -> Option<BasicStatus> {
     if staged {
         if status.contains(Status::INDEX_NEW) {
-            Some(FileStatus::Added)
+            Some(BasicStatus::Added)
         } else if status.contains(Status::INDEX_MODIFIED) {
-            Some(FileStatus::Modified)
+            Some(BasicStatus::Modified)
         } else if status.contains(Status::INDEX_DELETED) {
-            Some(FileStatus::Deleted)
+            Some(BasicStatus::Deleted)
         } else if status.contains(Status::INDEX_RENAMED) {
-            Some(FileStatus::Renamed)
+            Some(BasicStatus::Renamed)
         } else if status.contains(Status::INDEX_TYPECHANGE) {
-            Some(FileStatus::Typechange)
+            Some(BasicStatus::Typechange)
         } else {
             None
         }
     } else if status.contains(Status::WT_NEW) {
-        Some(FileStatus::Untracked)
+        Some(BasicStatus::Untracked)
     } else if status.contains(Status::WT_MODIFIED) {
-        Some(FileStatus::Modified)
+        Some(BasicStatus::Modified)
     } else if status.contains(Status::WT_DELETED) {
-        Some(FileStatus::Deleted)
+        Some(BasicStatus::Deleted)
     } else if status.contains(Status::WT_RENAMED) {
-        Some(FileStatus::Renamed)
+        Some(BasicStatus::Renamed)
     } else if status.contains(Status::WT_TYPECHANGE) {
-        Some(FileStatus::Typechange)
+        Some(BasicStatus::Typechange)
     } else if status.contains(Status::CONFLICTED) {
-        Some(FileStatus::Conflicted)
+        Some(BasicStatus::Conflicted)
     } else {
         None
+    }
+}
+
+fn basic_to_kind(basic: BasicStatus, old_path: Option<String>) -> FileEntryKind {
+    match basic {
+        BasicStatus::Added => FileEntryKind::Added,
+        BasicStatus::Modified => FileEntryKind::Modified,
+        BasicStatus::Deleted => FileEntryKind::Deleted,
+        BasicStatus::Renamed => FileEntryKind::Renamed {
+            old_path: old_path.unwrap_or_default(),
+        },
+        BasicStatus::Untracked => FileEntryKind::Untracked,
+        BasicStatus::Typechange => FileEntryKind::Typechange,
+        BasicStatus::Conflicted => FileEntryKind::Conflicted,
     }
 }
 
@@ -97,13 +122,16 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
         let default_path = entry.path().unwrap_or("").to_owned();
         let status = entry.status();
 
-        if let Some(file_status) = status_to_file_status(status, true) {
+        if let Some(basic_status) = status_to_basic(status, true) {
             let (path, old_path) = if status.contains(Status::INDEX_RENAMED) {
                 let diff_delta = entry.head_to_index();
                 let new_path = diff_delta
                     .as_ref()
                     .and_then(|d| d.new_file().path())
-                    .map_or_else(|| default_path.clone(), |p| p.to_string_lossy().into_owned());
+                    .map_or_else(
+                        || default_path.clone(),
+                        |p| p.to_string_lossy().into_owned(),
+                    );
                 let old = diff_delta
                     .and_then(|d| d.old_file().path())
                     .map(|p| p.to_string_lossy().into_owned());
@@ -114,17 +142,15 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
 
             staged.push(FileEntry {
                 path,
-                status: file_status,
-                old_path,
+                kind: basic_to_kind(basic_status, old_path),
             });
         }
 
-        if let Some(file_status) = status_to_file_status(status, false) {
-            if file_status == FileStatus::Untracked {
+        if let Some(basic_status) = status_to_basic(status, false) {
+            if matches!(basic_status, BasicStatus::Untracked) {
                 untracked.push(FileEntry {
                     path: default_path.clone(),
-                    status: file_status,
-                    old_path: None,
+                    kind: FileEntryKind::Untracked,
                 });
             } else {
                 let (path, old_path) = if status.contains(Status::WT_RENAMED) {
@@ -132,7 +158,10 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
                     let new_path = diff_delta
                         .as_ref()
                         .and_then(|d| d.new_file().path())
-                        .map_or_else(|| default_path.clone(), |p| p.to_string_lossy().into_owned());
+                        .map_or_else(
+                            || default_path.clone(),
+                            |p| p.to_string_lossy().into_owned(),
+                        );
                     let old = diff_delta
                         .and_then(|d| d.old_file().path())
                         .map(|p| p.to_string_lossy().into_owned());
@@ -143,8 +172,7 @@ fn get_status_with_repo(repo: &Repository) -> Result<GitStatus, CoreError> {
 
                 unstaged.push(FileEntry {
                     path,
-                    status: file_status,
-                    old_path,
+                    kind: basic_to_kind(basic_status, old_path),
                 });
             }
         }
@@ -208,14 +236,12 @@ fn get_file_diff_with_repo(
 
         if let Some(h) = hunk {
             let mut hunks_ref = hunks.borrow_mut();
-            let needs_new_hunk = hunks_ref
-                .last()
-                .is_none_or(|last| {
-                    last.old_start != h.old_start()
-                        || last.new_start != h.new_start()
-                        || last.old_lines != h.old_lines()
-                        || last.new_lines != h.new_lines()
-                });
+            let needs_new_hunk = hunks_ref.last().is_none_or(|last| {
+                last.old_start != h.old_start()
+                    || last.new_start != h.new_start()
+                    || last.old_lines != h.old_lines()
+                    || last.new_lines != h.new_lines()
+            });
 
             if needs_new_hunk {
                 hunks_ref.push(DiffHunk {
@@ -456,7 +482,7 @@ mod tests {
         assert!(status.unstaged.is_empty());
         assert_eq!(status.untracked.len(), 1);
         assert_eq!(status.untracked[0].path, "new_file.txt");
-        assert_eq!(status.untracked[0].status, FileStatus::Untracked);
+        assert!(matches!(status.untracked[0].kind, FileEntryKind::Untracked));
     }
 
     #[test]
@@ -471,7 +497,7 @@ mod tests {
         let status = get_status(temp_dir.path()).unwrap();
         assert_eq!(status.staged.len(), 1);
         assert_eq!(status.staged[0].path, "staged.txt");
-        assert_eq!(status.staged[0].status, FileStatus::Added);
+        assert!(matches!(status.staged[0].kind, FileEntryKind::Added));
         assert!(status.unstaged.is_empty());
         assert!(status.untracked.is_empty());
     }
@@ -491,7 +517,7 @@ mod tests {
         let status = get_status(temp_dir.path()).unwrap();
         assert_eq!(status.staged.len(), 1);
         assert_eq!(status.staged[0].path, "file.txt");
-        assert_eq!(status.staged[0].status, FileStatus::Modified);
+        assert!(matches!(status.staged[0].kind, FileEntryKind::Modified));
     }
 
     #[test]
@@ -507,7 +533,7 @@ mod tests {
         assert!(status.staged.is_empty());
         assert_eq!(status.unstaged.len(), 1);
         assert_eq!(status.unstaged[0].path, "file.txt");
-        assert_eq!(status.unstaged[0].status, FileStatus::Modified);
+        assert!(matches!(status.unstaged[0].kind, FileEntryKind::Modified));
     }
 
     #[test]

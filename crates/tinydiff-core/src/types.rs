@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "specta")]
 use specta::Type;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
-#[serde(rename_all = "lowercase")]
-pub enum FileStatus {
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum FileEntryKind {
     Added,
     Modified,
     Deleted,
-    Renamed,
+    Renamed { old_path: String },
     Untracked,
     Typechange,
     Conflicted,
@@ -21,8 +21,7 @@ pub enum FileStatus {
 #[serde(rename_all = "camelCase")]
 pub struct FileEntry {
     pub path: String,
-    pub status: FileStatus,
-    pub old_path: Option<String>,
+    pub kind: FileEntryKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
