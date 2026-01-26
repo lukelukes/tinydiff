@@ -36,6 +36,6 @@ fn main() {
                 })
             },
         )
-        .unwrap();
+        .expect("failed to open main window");
     });
 }
