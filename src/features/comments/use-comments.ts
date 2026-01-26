@@ -10,6 +10,11 @@ export interface PendingComment {
   startLine?: number;
 }
 
+type CommentFormState =
+  | { type: 'closed' }
+  | { type: 'pending'; comment: PendingComment }
+  | { type: 'editing'; commentId: string };
+
 type CommentsState =
   | { status: 'loading' }
   | { status: 'success'; data: CommentCollection }
@@ -17,8 +22,10 @@ type CommentsState =
 
 export function useComments(repoPath: string) {
   const [state, setState] = useState<CommentsState>({ status: 'loading' });
-  const [pendingComment, setPendingComment] = useState<PendingComment | null>(null);
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [formState, setFormState] = useState<CommentFormState>({ type: 'closed' });
+
+  const pendingComment = formState.type === 'pending' ? formState.comment : null;
+  const editingCommentId = formState.type === 'editing' ? formState.commentId : null;
 
   const refresh = useCallback(async () => {
     setState({ status: 'loading' });
@@ -36,7 +43,7 @@ export function useComments(repoPath: string) {
   }, [refresh]);
 
   const closeCommentForm = useCallback(() => {
-    setPendingComment(null);
+    setFormState({ type: 'closed' });
   }, []);
 
   const saveComment = useCallback(
@@ -93,21 +100,17 @@ export function useComments(repoPath: string) {
 
   const openCommentForm = useCallback(
     (side: 'deletions' | 'additions', lineNumber: number, startLine?: number) => {
-      setPendingComment({ side, lineNumber, startLine });
+      setFormState({ type: 'pending', comment: { side, lineNumber, startLine } });
     },
     []
   );
 
-  const startEditing = useCallback(
-    (id: string) => {
-      closeCommentForm();
-      setEditingCommentId(id);
-    },
-    [closeCommentForm]
-  );
+  const startEditing = useCallback((id: string) => {
+    setFormState({ type: 'editing', commentId: id });
+  }, []);
 
   const stopEditing = useCallback(() => {
-    setEditingCommentId(null);
+    setFormState({ type: 'closed' });
   }, []);
 
   return {
