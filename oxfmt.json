@@ -12,5 +12,5 @@
     "sortScripts": true
   },
 
-  "ignorePatterns": ["dist", "node_modules", "tauri-bindings"]
+  "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "**/*.toml", "**/*.md"]
 }
