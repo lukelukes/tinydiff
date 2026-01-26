@@ -5,6 +5,7 @@ description = "A tiny diff viewer"
 authors = ["you"]
 edition = "2024"
 rust-version = "1.92.0"
+publish = false
 
 [lints]
 workspace = true

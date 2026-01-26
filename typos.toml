@@ -1,0 +1,13 @@
+[files]
+extend-exclude = [
+    "*.lock",
+    "target/",
+    "node_modules/",
+    "dist/",
+]
+
+[default]
+check-filename = true
+
+[default.extend-words]
+edn = "edn"

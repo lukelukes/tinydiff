@@ -15,6 +15,7 @@ unwrap_used = "warn"
 expect_used = "allow"
 redundant_clone = "deny"
 disallowed_methods = "deny"
+declare_interior_mutable_const = "deny"
 
 panic = "warn"
 clone_on_ref_ptr = "warn"

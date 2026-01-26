@@ -1,0 +1,77 @@
+[graph]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+
+[advisories]
+ignore = [
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error - transitive dep" },
+    { id = "RUSTSEC-2024-0388", reason = "paste - transitive dep" },
+    { id = "RUSTSEC-2024-0400", reason = "atk - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0403", reason = "rustls-pemfile - transitive dep" },
+    { id = "RUSTSEC-2024-0411", reason = "gdk - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0412", reason = "gdk-pixbuf - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0413", reason = "atk - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0414", reason = "cairo-rs - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0415", reason = "gdk-sys - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0416", reason = "gdk-pixbuf-sys - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0417", reason = "cairo-sys - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0418", reason = "pango - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0419", reason = "pango-sys - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0420", reason = "gtk - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2024-0429", reason = "fxhash - transitive dep from gpui" },
+    { id = "RUSTSEC-2024-0436", reason = "glib unsoundness - transitive dep from tauri" },
+    { id = "RUSTSEC-2025-0024", reason = "unic-ucd-version - transitive dep" },
+    { id = "RUSTSEC-2025-0052", reason = "async-std - transitive dep from gpui" },
+    { id = "RUSTSEC-2025-0057", reason = "gio - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2025-0075", reason = "unic-ucd-ident - transitive dep" },
+    { id = "RUSTSEC-2025-0080", reason = "unic-common - transitive dep" },
+    { id = "RUSTSEC-2025-0081", reason = "unic-char-range - transitive dep" },
+    { id = "RUSTSEC-2025-0098", reason = "unic-char-property - transitive dep" },
+    { id = "RUSTSEC-2025-0100", reason = "gio-sys - gtk3 bindings from tauri" },
+    { id = "RUSTSEC-2025-0134", reason = "gobject-sys - gtk3 bindings from tauri" },
+]
+
+[licenses]
+private = { ignore = true }
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+    "OpenSSL",
+]
+confidence-threshold = 0.8
+exceptions = [
+    { allow = ["LGPL-2.1-only"], crate = "gdk-pixbuf-sys" },
+    { allow = ["LGPL-2.1-only"], crate = "gdk-sys" },
+    { allow = ["LGPL-2.1-only"], crate = "gio-sys" },
+    { allow = ["LGPL-2.1-only"], crate = "glib-sys" },
+    { allow = ["LGPL-2.1-only"], crate = "gobject-sys" },
+    { allow = ["LGPL-2.1-only"], crate = "gtk-sys" },
+    { allow = ["LGPL-2.1-only"], crate = "pango-sys" },
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+[sources.allow-org]
+github = []
