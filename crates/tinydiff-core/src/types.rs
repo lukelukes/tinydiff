@@ -66,7 +66,7 @@ pub struct DiffHunk {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "specta", derive(Type))]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "contentType", rename_all = "camelCase")]
 pub enum DiffContent {
     Text { hunks: Vec<DiffHunk> },
     Binary,
