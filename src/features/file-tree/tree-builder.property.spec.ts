@@ -77,7 +77,40 @@ function checkAlphabetical(nodes: FileTreeNode[]): boolean {
   return dirs.every((d) => checkAlphabetical(d.children));
 }
 
+function collectAllNodes(nodes: FileTreeNode[]): FileTreeNode[] {
+  const result: FileTreeNode[] = [];
+  for (const node of nodes) {
+    result.push(node);
+    if (node.type === 'directory') {
+      result.push(...collectAllNodes(node.children));
+    }
+  }
+  return result;
+}
+
 describe('buildFileTree properties', () => {
+  it('file nodes never have children property', () => {
+    fc.assert(
+      fc.property(uniqueFilePathsArb, (paths) => {
+        const tree = buildFileTree(createGitStatus(paths));
+        return collectAllNodes(tree)
+          .filter((n) => n.type === 'file')
+          .every((f) => !('children' in f));
+      })
+    );
+  });
+
+  it('directory nodes never have kind or isStaged properties', () => {
+    fc.assert(
+      fc.property(uniqueFilePathsArb, (paths) => {
+        const tree = buildFileTree(createGitStatus(paths));
+        return collectAllNodes(tree)
+          .filter((n) => n.type === 'directory')
+          .every((d) => !('kind' in d) && !('isStaged' in d));
+      })
+    );
+  });
+
   it('preserves all file paths from input', () => {
     fc.assert(
       fc.property(uniqueFilePathsArb, (paths) => {

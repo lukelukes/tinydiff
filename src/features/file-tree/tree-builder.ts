@@ -2,17 +2,31 @@ import type { CSSProperties } from 'react';
 
 import type { FileEntry, FileEntryKind, GitStatus } from '../../../tauri-bindings';
 
-export type TreeNodeType = 'file' | 'directory';
-
 type FileStatus = FileEntryKind['status'];
 
-export interface FileTreeNode {
+export interface FileNode {
+  type: 'file';
   name: string;
   path: string;
-  type: TreeNodeType;
-  kind?: FileEntryKind;
+  kind: FileEntryKind;
   isStaged: boolean;
+}
+
+export interface DirectoryNode {
+  type: 'directory';
+  name: string;
+  path: string;
   children: FileTreeNode[];
+}
+
+export type FileTreeNode = FileNode | DirectoryNode;
+
+export function isFileNode(node: FileTreeNode): node is FileNode {
+  return node.type === 'file';
+}
+
+export function isDirectoryNode(node: FileTreeNode): node is DirectoryNode {
+  return node.type === 'directory';
 }
 
 interface FileWithStaged extends FileEntry {
@@ -30,17 +44,16 @@ export function buildFileTree(status: GitStatus): FileTreeNode[] {
     ...status.untracked.map((f) => ({ ...f, isStaged: false }))
   ];
 
-  const root: FileTreeNode = {
+  const root: DirectoryNode = {
+    type: 'directory',
     name: '',
     path: '',
-    type: 'directory',
-    isStaged: false,
     children: []
   };
 
   for (const file of allFiles) {
     const parts = file.path.split('/');
-    let current = root;
+    let current: DirectoryNode = root;
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i]!;
@@ -49,21 +62,21 @@ export function buildFileTree(status: GitStatus): FileTreeNode[] {
 
       if (isFile) {
         current.children.push({
+          type: 'file',
           name: part,
           path: file.path,
-          type: 'file',
           kind: file.kind,
-          isStaged: file.isStaged,
-          children: []
+          isStaged: file.isStaged
         });
       } else {
-        let dir = current.children.find((c) => c.type === 'directory' && c.name === part);
+        let dir = current.children.find(
+          (c): c is DirectoryNode => c.type === 'directory' && c.name === part
+        );
         if (!dir) {
           dir = {
+            type: 'directory',
             name: part,
             path: pathSoFar,
-            type: 'directory',
-            isStaged: false,
             children: []
           };
           current.children.push(dir);
@@ -77,7 +90,7 @@ export function buildFileTree(status: GitStatus): FileTreeNode[] {
   return root.children;
 }
 
-function sortTree(node: FileTreeNode): void {
+function sortTree(node: DirectoryNode): void {
   node.children.sort((a, b) => {
     if (a.type !== b.type) {
       return a.type === 'directory' ? -1 : 1;
@@ -85,7 +98,7 @@ function sortTree(node: FileTreeNode): void {
     return a.name.localeCompare(b.name);
   });
   for (const child of node.children) {
-    if (child.type === 'directory') {
+    if (isDirectoryNode(child)) {
       sortTree(child);
     }
   }
