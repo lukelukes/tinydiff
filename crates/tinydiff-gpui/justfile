@@ -1,14 +1,33 @@
+set quiet
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+pkg := "tinydiff-gpui"
+
+[group('check')]
 fmt:
-    cargo fmt -p tinydiff-gpui
+    cargo fmt -p {{ pkg }}
 
-dev:
-    cargo run -p tinydiff-gpui
+[group('check')]
+fmt-check:
+    cargo fmt -p {{ pkg }} -- --check
 
-build:
-    cargo build -p tinydiff-gpui --release
-
-check:
-    cargo check -p tinydiff-gpui
-
+[group('check')]
 clippy:
-    cargo clippy -p tinydiff-gpui -- -D warnings
+    cargo clippy -p {{ pkg }} -- -D warnings
+
+[group('check')]
+test:
+    cargo test -p {{ pkg }}
+
+[group('check')]
+[parallel]
+check: fmt clippy test
+
+[group('dev')]
+[no-exit-message]
+dev:
+    cargo run -p {{ pkg }}
+
+[group('dev')]
+build:
+    cargo build -p {{ pkg }} --release
