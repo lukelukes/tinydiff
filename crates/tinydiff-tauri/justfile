@@ -1,31 +1,46 @@
+set quiet
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+export RUST_LOG := env("RUST_LOG", "debug")
+
+[group('check')]
 fmt:
     cargo fmt
 
+[group('check')]
 fmt-check:
     cargo fmt -- --check
 
+[group('check')]
 clippy:
     cargo clippy --all-targets -- -D warnings
 
+[group('check')]
 test:
     cargo test
 
+[group('check')]
+[parallel]
 check: fmt clippy test
 
+[group('dev')]
 build:
     cargo build --release
 
+[group('dev')]
+[no-exit-message]
 run:
-    RUST_LOG=debug cargo run
+    cargo run
 
-ci: check
-    @echo "All checks passed!"
-
+[group('dev')]
+[no-exit-message]
 fix:
     cargo clippy --all-targets --fix --allow-dirty
 
+[group('dev')]
+[confirm("This will remove all build artifacts. Continue?")]
 clean:
     cargo clean
 
-deny:
-    cargo deny check
+ci: check
+    @echo "All checks passed!"
