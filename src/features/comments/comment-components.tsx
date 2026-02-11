@@ -83,16 +83,7 @@ function CommentTextarea({
         onKeyDown={handleKeyDown}
         placeholder="Leave a comment..."
         disabled={isSubmitting}
-        className={cn(
-          'w-full min-h-[80px] p-3',
-          'bg-background border border-input rounded-md',
-          'text-sm text-foreground',
-          'placeholder:text-muted-foreground',
-          'focus:outline-none focus:ring-2 focus:ring-ring',
-          'resize-none',
-          'font-sans',
-          'disabled:opacity-50 disabled:cursor-not-allowed'
-        )}
+        className="w-full min-h-[80px] p-3 bg-background border border-input rounded-md text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none font-sans disabled:opacity-50 disabled:cursor-not-allowed"
       />
       <div className="flex justify-end gap-2 mt-3">
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={isSubmitting}>
@@ -311,11 +302,7 @@ export function CommentDisplay({
                   ref={editButtonRef}
                   onClick={onStartEdit}
                   disabled={isOperationPending}
-                  className={cn(
-                    'flex items-center justify-center h-7 w-7 rounded-md',
-                    'text-muted-foreground hover:text-foreground hover:bg-muted/50',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
+                  className="flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label="Edit comment"
                 >
                   <HugeiconsIcon icon={PencilEdit01Icon} size={14} />
@@ -368,13 +355,7 @@ export function AddCommentButton({ onClick }: AddCommentButtonProps) {
         e.stopPropagation();
         onClick();
       }}
-      className={cn(
-        'h-5 w-5 rounded-md',
-        'bg-primary text-primary-foreground',
-        'flex items-center justify-center',
-        'cursor-pointer',
-        'text-xs font-medium'
-      )}
+      className="h-5 w-5 rounded-md bg-primary text-primary-foreground flex items-center justify-center cursor-pointer text-xs font-medium"
       aria-label="Add comment"
     >
       +

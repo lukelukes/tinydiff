@@ -1,5 +1,3 @@
-import type { CSSProperties } from 'react';
-
 import type { FileEntry, FileEntryKind, GitStatus } from '../../../tauri-bindings';
 
 type FileStatus = FileEntryKind['status'];
@@ -21,157 +19,87 @@ export interface DirectoryNode {
 
 export type FileTreeNode = FileNode | DirectoryNode;
 
-export function isFileNode(node: FileTreeNode): node is FileNode {
-  return node.type === 'file';
-}
-
-export function isDirectoryNode(node: FileTreeNode): node is DirectoryNode {
-  return node.type === 'directory';
-}
-
 interface FileWithStaged extends FileEntry {
   isStaged: boolean;
 }
 
-/**
- * Build a tree structure from git status.
- * Groups files by directory and creates nested structure.
- */
 export function buildFileTree(status: GitStatus): FileTreeNode[] {
-  const allFiles: FileWithStaged[] = [
+  const files: FileWithStaged[] = [
     ...status.staged.map((f) => ({ ...f, isStaged: true })),
     ...status.unstaged.map((f) => ({ ...f, isStaged: false })),
     ...status.untracked.map((f) => ({ ...f, isStaged: false }))
   ];
 
-  const root: DirectoryNode = {
-    type: 'directory',
-    name: '',
-    path: '',
-    children: []
-  };
+  const root = createDirectory('', '');
+  const directories = new Map<string, DirectoryNode>([['', root]]);
 
-  for (const file of allFiles) {
-    const parts = file.path.split('/');
-    let current: DirectoryNode = root;
+  for (const file of files) {
+    const segments = file.path.split('/');
+    const fileName = segments.pop();
+    if (!fileName) continue;
+    let parent = root;
+    let directoryPath = '';
 
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i]!;
-      const isFile = i === parts.length - 1;
-      const pathSoFar = parts.slice(0, i + 1).join('/');
-
-      if (isFile) {
-        current.children.push({
-          type: 'file',
-          name: part,
-          path: file.path,
-          kind: file.kind,
-          isStaged: file.isStaged
-        });
-      } else {
-        let dir = current.children.find(
-          (c): c is DirectoryNode => c.type === 'directory' && c.name === part
-        );
-        if (!dir) {
-          dir = {
-            type: 'directory',
-            name: part,
-            path: pathSoFar,
-            children: []
-          };
-          current.children.push(dir);
-        }
-        current = dir;
+    for (const segment of segments) {
+      directoryPath = directoryPath ? `${directoryPath}/${segment}` : segment;
+      const cached = directories.get(directoryPath);
+      if (cached) {
+        parent = cached;
+        continue;
       }
+      const next = createDirectory(segment, directoryPath);
+      parent.children.push(next);
+      directories.set(directoryPath, next);
+      parent = next;
     }
+
+    parent.children.push(createFileNode(fileName, file));
   }
 
   sortTree(root);
   return root.children;
 }
 
+function createDirectory(name: string, path: string): DirectoryNode {
+  return { type: 'directory', name, path, children: [] };
+}
+
+function createFileNode(name: string, file: FileWithStaged): FileNode {
+  return {
+    type: 'file',
+    name,
+    path: file.path,
+    kind: file.kind,
+    isStaged: file.isStaged
+  };
+}
+
 function sortTree(node: DirectoryNode): void {
-  node.children.sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
+  node.children.sort(compareNodes);
   for (const child of node.children) {
-    if (isDirectoryNode(child)) {
+    if (child.type === 'directory') {
       sortTree(child);
     }
   }
 }
 
-/**
- * Get display label for a file status
- */
+function compareNodes(a: FileTreeNode, b: FileTreeNode): number {
+  if (a.type !== b.type) {
+    return a.type === 'directory' ? -1 : 1;
+  }
+  return a.name.localeCompare(b.name);
+}
+
+const STATUS_META = {
+  added: { label: 'A', className: 'text-git-added', colorName: 'added' },
+  modified: { label: 'M', className: 'text-git-modified', colorName: 'modified' },
+  deleted: { label: 'D', className: 'text-git-deleted', colorName: 'deleted' },
+  renamed: { label: 'R', className: 'text-git-renamed', colorName: 'renamed' },
+  untracked: { label: 'U', className: 'text-git-untracked', colorName: 'untracked' },
+  typechange: { label: 'T', className: 'text-git-renamed', colorName: 'renamed' },
+  conflicted: { label: 'C', className: 'text-git-conflicted', colorName: 'conflicted' }
+} satisfies Record<FileStatus, { label: string; className: string; colorName: string }>;
+
 export function getStatusLabel(status: FileStatus): string {
-  switch (status) {
-    case 'added':
-      return 'A';
-    case 'modified':
-      return 'M';
-    case 'deleted':
-      return 'D';
-    case 'renamed':
-      return 'R';
-    case 'untracked':
-      return 'U';
-    case 'typechange':
-      return 'T';
-    case 'conflicted':
-      return 'C';
-    default:
-      return status satisfies never;
-  }
-}
-
-/**
- * Get CSS class for a file status
- */
-export function getStatusColorClass(status: FileStatus): string {
-  switch (status) {
-    case 'added':
-      return 'text-git-added';
-    case 'untracked':
-      return 'text-git-untracked';
-    case 'modified':
-      return 'text-git-modified';
-    case 'deleted':
-      return 'text-git-deleted';
-    case 'renamed':
-      return 'text-git-renamed';
-    case 'typechange':
-      return 'text-git-renamed';
-    case 'conflicted':
-      return 'text-git-conflicted';
-    default:
-      return status satisfies never;
-  }
-}
-
-/**
- * Get inline styles for file status badge
- */
-export function getStatusStyles(status: FileStatus): CSSProperties {
-  switch (status) {
-    case 'added':
-      return { backgroundColor: 'var(--git-added-bg)', color: 'var(--git-added)' };
-    case 'untracked':
-      return { backgroundColor: 'var(--git-untracked-bg)', color: 'var(--git-untracked)' };
-    case 'modified':
-      return { backgroundColor: 'var(--git-modified-bg)', color: 'var(--git-modified)' };
-    case 'deleted':
-      return { backgroundColor: 'var(--git-deleted-bg)', color: 'var(--git-deleted)' };
-    case 'renamed':
-      return { backgroundColor: 'var(--git-renamed-bg)', color: 'var(--git-renamed)' };
-    case 'typechange':
-      return { backgroundColor: 'var(--git-renamed-bg)', color: 'var(--git-renamed)' };
-    case 'conflicted':
-      return { backgroundColor: 'var(--git-conflicted-bg)', color: 'var(--git-conflicted)' };
-    default:
-      return status satisfies never;
-  }
+  return STATUS_META[status].label;
 }

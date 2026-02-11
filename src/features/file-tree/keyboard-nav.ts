@@ -23,63 +23,49 @@ export function applyKeyboardNav(
   const flatNodes = flattenTree(tree, collapsedPaths);
 
   if (flatNodes.length === 0) {
-    return { focusedPath, collapsedPaths };
+    return state;
   }
 
   const currentIndex =
     focusedPath === null ? -1 : flatNodes.findIndex((f) => f.node.path === focusedPath);
   const currentFlat = currentIndex >= 0 ? flatNodes[currentIndex] : null;
+  const move = (step: number) => {
+    const nextIndex = (currentIndex + step + flatNodes.length) % flatNodes.length;
+    return flatNodes[nextIndex]?.node.path ?? focusedPath;
+  };
 
   switch (key) {
-    case 'ArrowDown': {
-      const nextIndex = currentIndex < flatNodes.length - 1 ? currentIndex + 1 : 0;
-      const next = flatNodes[nextIndex];
-      return { focusedPath: next?.node.path ?? focusedPath, collapsedPaths };
-    }
-
-    case 'ArrowUp': {
-      const prevIndex = currentIndex > 0 ? currentIndex - 1 : flatNodes.length - 1;
-      const prev = flatNodes[prevIndex];
-      return { focusedPath: prev?.node.path ?? focusedPath, collapsedPaths };
-    }
+    case 'ArrowDown':
+      return { focusedPath: move(1), collapsedPaths };
+    case 'ArrowUp':
+      return { focusedPath: move(-1), collapsedPaths };
+    case 'Home':
+      return { focusedPath: flatNodes[0]?.node.path ?? focusedPath, collapsedPaths };
+    case 'End':
+      return { focusedPath: flatNodes.at(-1)?.node.path ?? focusedPath, collapsedPaths };
 
     case 'ArrowRight': {
       if (!currentFlat || currentFlat.node.type !== 'directory') {
-        return { focusedPath, collapsedPaths };
+        return state;
       }
 
       if (collapsedPaths.has(currentFlat.node.path)) {
         const newCollapsed = new Set(collapsedPaths);
         newCollapsed.delete(currentFlat.node.path);
         return { focusedPath, collapsedPaths: newCollapsed };
-      } else if (currentFlat.node.children.length > 0) {
-        const firstChild = currentFlat.node.children[0];
-        return { focusedPath: firstChild?.path ?? focusedPath, collapsedPaths };
       }
-      return { focusedPath, collapsedPaths };
+      return { focusedPath: currentFlat.node.children[0]?.path ?? focusedPath, collapsedPaths };
     }
 
     case 'ArrowLeft': {
       if (!currentFlat) {
-        return { focusedPath, collapsedPaths };
+        return state;
       }
 
       if (currentFlat.node.type === 'directory' && !collapsedPaths.has(currentFlat.node.path)) {
         return { focusedPath, collapsedPaths: new Set([...collapsedPaths, currentFlat.node.path]) };
-      } else if (currentFlat.parentPath !== null) {
-        return { focusedPath: currentFlat.parentPath, collapsedPaths };
       }
-      return { focusedPath, collapsedPaths };
-    }
-
-    case 'Home': {
-      const first = flatNodes[0];
-      return { focusedPath: first?.node.path ?? focusedPath, collapsedPaths };
-    }
-
-    case 'End': {
-      const last = flatNodes.at(-1);
-      return { focusedPath: last?.node.path ?? focusedPath, collapsedPaths };
+      return { focusedPath: currentFlat.parentPath ?? focusedPath, collapsedPaths };
     }
   }
 }

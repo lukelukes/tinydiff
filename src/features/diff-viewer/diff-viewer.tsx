@@ -5,7 +5,7 @@ import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/react';
 import { MultiFileDiff } from '@pierre/diffs/react';
 import { preloadMultiFileDiff } from '@pierre/diffs/ssr';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import type { Comment, DiffFile } from '../../../tauri-bindings';
 import type { PendingComment } from '../comments';
@@ -17,19 +17,30 @@ type AnnotationSide = 'deletions' | 'additions';
 
 export type { SelectedLineRange };
 
-interface CommentAnnotation {
-  type: 'comment';
-  comment: Comment;
-}
+type AnnotationMetadata =
+  | { type: 'comment'; comment: Comment }
+  | { type: 'form'; startLine?: number };
 
-interface FormAnnotation {
-  type: 'form';
-  startLine?: number;
-}
+type ReviewProps = {
+  comments?: Comment[];
+  pendingComment?: PendingComment | null;
+  editingCommentId?: string | null;
+  selectedLines?: SelectedLineRange | null;
+  onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
+  onSubmitComment?: (
+    body: string,
+    side: AnnotationSide,
+    lineNumber: number,
+    startLine?: number
+  ) => Promise<void>;
+  onCancelComment?: () => void;
+  onUpdateComment?: (comment: Comment) => Promise<void>;
+  onDeleteComment?: (commentId: string) => Promise<void>;
+  onStartEditComment?: (commentId: string) => void;
+  onStopEditComment?: () => void;
+};
 
-type AnnotationMetadata = CommentAnnotation | FormAnnotation;
-
-interface DiffViewerProps {
+type DiffViewerProps = ReviewProps & {
   oldFile: DiffFile | null;
   newFile: DiffFile | null;
   isLoading: boolean;
@@ -37,288 +48,187 @@ interface DiffViewerProps {
   onRetry?: () => void;
   isDark?: boolean;
   diffStyle?: DiffStyle;
-  comments?: Comment[];
-  pendingComment?: PendingComment | null;
-  editingCommentId?: string | null;
-  selectedLines?: SelectedLineRange | null;
-  onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
-  onSubmitComment?: (
-    body: string,
-    side: AnnotationSide,
-    lineNumber: number,
-    startLine?: number
-  ) => Promise<void>;
-  onCancelComment?: () => void;
-  onUpdateComment?: (comment: Comment) => Promise<void>;
-  onDeleteComment?: (commentId: string) => Promise<void>;
-  onStartEditComment?: (commentId: string) => void;
-  onStopEditComment?: () => void;
-}
+};
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getExtension(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot > 0 ? name.slice(dot) : '';
-}
-
-function toFileContents(file: DiffFile): FileContents {
-  return {
-    name: file.name,
-    contents: file.content?.type === 'text' ? file.content.contents : '',
-    // oxlint-disable-next-line no-unsafe-type-assertion
-    lang: (file.lang ?? 'text') as FileContents['lang']
-  };
-}
-
-// Threshold for considering a diff "large" - preload for better UX
-const LARGE_DIFF_LINE_THRESHOLD = 500;
-
-// Timeout for preloading to prevent UI from being stuck indefinitely
-const PRELOAD_TIMEOUT_MS = 10_000;
-
-function countLines(content: string): number {
-  if (!content) return 0;
-  return content.split('\n').length;
-}
-
-function djb2Hash(str: string): number {
-  let hash = 5381;
-  for (let i = 0; i < str.length; i++) {
-    const codePoint = str.codePointAt(i) ?? 0;
-    hash = ((hash << 5) + hash) ^ codePoint;
-  }
-  // Convert to unsigned 32-bit integer
-  // eslint-disable-next-line unicorn/prefer-math-trunc -- >>> 0 converts to unsigned, Math.trunc doesn't
-  return hash >>> 0;
-}
-
-// Generate a cache key for the diff based on file contents and options
-function generateCacheKey(
-  oldFile: FileContents,
-  newFile: FileContents,
-  diffStyle: DiffStyle,
-  isDark: boolean
-): string {
-  // Hash actual content to ensure unique keys for different files
-  const oldHash = djb2Hash(oldFile.contents);
-  const newHash = djb2Hash(newFile.contents);
-  return `${oldFile.name}:${oldHash}:${newFile.name}:${newHash}:${diffStyle}:${isDark ? 'dark' : 'light'}`;
-}
-
-function EmptyState() {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="mx-auto grid place-items-center text-center">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 ring-1 ring-border/50">
-          <HugeiconsIcon icon={File01Icon} size={20} className="text-muted-foreground" />
-        </div>
-        <p className="text-sm text-muted-foreground">Select a file to view diff</p>
-        <p className="mt-1 text-xs text-muted-foreground">Choose from the sidebar</p>
-      </div>
-    </div>
-  );
-}
-
-function LoadingState() {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <HugeiconsIcon icon={ReloadIcon} size={20} className="animate-spin text-primary" />
-        </div>
-        <p className="text-sm text-muted-foreground">Loading diff...</p>
-      </div>
-    </div>
-  );
-}
-
-function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center">
-      <div className="max-w-sm px-6 text-center">
-        <div className="mb-4 flex justify-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-destructive/10 ring-1 ring-destructive/20">
-            <HugeiconsIcon icon={Alert02Icon} size={24} className="text-destructive" />
-          </div>
-        </div>
-        <p className="mb-1.5 text-base font-medium text-foreground">Error loading diff</p>
-        <p className="text-sm text-muted-foreground">{message}</p>
-        {onRetry && (
-          <button
-            onClick={onRetry}
-            className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Try again
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function BinaryFileState({ oldFile, newFile }: { oldFile: DiffFile; newFile: DiffFile }) {
-  const oldSize = oldFile.content?.type === 'binary' ? oldFile.content.size : null;
-  const newSize = newFile.content?.type === 'binary' ? newFile.content.size : null;
-  const ext = getExtension(newFile.name || oldFile.name);
-
-  // Build metadata line: ".ext · size" or just "size"
-  const sizePart = (() => {
-    if (oldSize !== null && newSize !== null && oldSize !== newSize) {
-      return `${formatFileSize(Number(oldSize))} → ${formatFileSize(Number(newSize))}`;
-    }
-    return formatFileSize(Number(newSize ?? oldSize ?? 0));
-  })();
-  const metadata = ext ? `${ext} · ${sizePart}` : sizePart;
-
-  return (
-    <div className="flex flex-1 items-center justify-center" role="status">
-      <div className="mx-auto grid place-items-center text-center">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 ring-1 ring-border/50">
-          <HugeiconsIcon icon={File01Icon} size={20} className="text-muted-foreground" />
-        </div>
-        <p className="text-sm text-muted-foreground">Binary content</p>
-        <p className="mt-1 text-xs text-muted-foreground">{metadata}</p>
-      </div>
-    </div>
-  );
-}
-
-function PreloadingState({ totalLines }: { totalLines: number }) {
-  return (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-          <HugeiconsIcon icon={ReloadIcon} size={20} className="animate-spin text-primary" />
-        </div>
-        <p className="text-sm text-muted-foreground">Rendering large diff...</p>
-        <p className="text-xs text-muted-foreground/60">{totalLines.toLocaleString()} lines</p>
-      </div>
-    </div>
-  );
-}
-
-interface PreloadedDiffViewerProps {
+type TextDiffViewerProps = {
   oldFile: FileContents;
   newFile: FileContents;
   diffStyle: DiffStyle;
   isDark: boolean;
-  comments?: Comment[];
-  pendingComment?: PendingComment | null;
-  editingCommentId?: string | null;
-  selectedLines?: SelectedLineRange | null;
-  onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
-  onSubmitComment?: (
-    body: string,
-    side: AnnotationSide,
-    lineNumber: number,
-    startLine?: number
-  ) => Promise<void>;
-  onCancelComment?: () => void;
-  onUpdateComment?: (comment: Comment) => Promise<void>;
-  onDeleteComment?: (commentId: string) => Promise<void>;
-  onStartEditComment?: (commentId: string) => void;
-  onStopEditComment?: () => void;
+  review: ReviewProps;
+};
+
+const LARGE_DIFF_LINE_THRESHOLD = 500;
+const PRELOAD_TIMEOUT_MS = 10_000;
+
+const formatBytes = (bytes: number) =>
+  bytes < 1024
+    ? `${bytes} B`
+    : bytes < 1024 * 1024
+      ? `${(bytes / 1024).toFixed(1)} KB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+
+const extension = (name: string) => {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot) : '';
+};
+
+const toFileContents = (file: DiffFile): FileContents => ({
+  name: file.name,
+  contents: file.content?.type === 'text' ? file.content.contents : '',
+  lang: undefined
+});
+
+const lineCount = (content: string) => (content ? content.split('\n').length : 0);
+
+function hash(value: string): number {
+  let result = 5381;
+  for (let i = 0; i < value.length; i++) {
+    result = ((result << 5) + result) ^ (value.codePointAt(i) ?? 0);
+  }
+  return Math.trunc(result);
 }
 
-const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
-  oldFile,
-  newFile,
-  diffStyle,
-  isDark,
-  comments = [],
-  pendingComment,
-  editingCommentId,
-  selectedLines,
-  onAddComment,
-  onSubmitComment,
-  onCancelComment,
-  onUpdateComment,
-  onDeleteComment,
-  onStartEditComment,
-  onStopEditComment
-}: PreloadedDiffViewerProps) {
-  const totalLines = useMemo(
-    () => countLines(oldFile.contents) + countLines(newFile.contents),
-    [oldFile.contents, newFile.contents]
-  );
+const cacheKey = (
+  oldFile: FileContents,
+  newFile: FileContents,
+  diffStyle: DiffStyle,
+  isDark: boolean
+) =>
+  `${oldFile.name}:${hash(oldFile.contents)}:${newFile.name}:${hash(newFile.contents)}:${diffStyle}:${isDark ? 'dark' : 'light'}`;
 
-  const large = totalLines > LARGE_DIFF_LINE_THRESHOLD;
-  const cacheKey = generateCacheKey(oldFile, newFile, diffStyle, isDark);
+function CardState({
+  title,
+  subtitle,
+  icon,
+  iconClass,
+  iconWrapClass,
+  role,
+  action
+}: {
+  title: string;
+  subtitle?: string;
+  icon: typeof File01Icon;
+  iconClass: string;
+  iconWrapClass: string;
+  role?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-1 items-center justify-center" role={role}>
+      <div className="mx-auto grid place-items-center text-center">
+        <div
+          className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${iconWrapClass}`}
+        >
+          <HugeiconsIcon icon={icon} size={20} className={iconClass} />
+        </div>
+        <p className="text-sm text-muted-foreground">{title}</p>
+        {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
+        {action}
+      </div>
+    </div>
+  );
+}
+
+function TextDiffViewer({ oldFile, newFile, diffStyle, isDark, review }: TextDiffViewerProps) {
+  const {
+    comments = [],
+    pendingComment,
+    editingCommentId,
+    selectedLines,
+    onAddComment,
+    onSubmitComment,
+    onCancelComment,
+    onUpdateComment,
+    onDeleteComment,
+    onStartEditComment,
+    onStopEditComment
+  } = review;
+
+  const totalLines = lineCount(oldFile.contents) + lineCount(newFile.contents);
+  const largeDiff = totalLines > LARGE_DIFF_LINE_THRESHOLD;
+  const key = cacheKey(oldFile, newFile, diffStyle, isDark);
+  const [oldWithCache, newWithCache] = useMemo(
+    () =>
+      [
+        { ...oldFile, cacheKey: key },
+        { ...newFile, cacheKey: key }
+      ] as const,
+    [oldFile, newFile, key]
+  );
   const themeType = isDark ? ('dark' as const) : ('light' as const);
 
-  const [prerenderedHTML, setPrerenderedHTML] = useState<string | null>(null);
-  const [isPreloading, setIsPreloading] = useState(large);
+  const [prerenderedHTML, setPrerenderedHTML] = useState<string>();
+  const [isPreloading, setIsPreloading] = useState(largeDiff);
 
-  const renderVersionRef = useRef(0);
+  useEffect(() => {
+    if (!largeDiff) return;
 
-  const oldFileWithCache = useMemo(
-    () => ({
-      name: oldFile.name,
-      contents: oldFile.contents,
-      lang: oldFile.lang,
-      cacheKey
-    }),
-    [oldFile.name, oldFile.contents, oldFile.lang, cacheKey]
-  );
-  const newFileWithCache = useMemo(
-    () => ({
-      name: newFile.name,
-      contents: newFile.contents,
-      lang: newFile.lang,
-      cacheKey
-    }),
-    [newFile.name, newFile.contents, newFile.lang, cacheKey]
-  );
+    let active = true;
+    const timeoutId = setTimeout(() => {
+      if (active) setIsPreloading(false);
+    }, PRELOAD_TIMEOUT_MS);
 
-  const preloadOptions = useMemo(
-    () => ({
-      diffStyle,
-      overflow: 'scroll' as const,
-      themeType,
-      expandUnchanged: false
-    }),
-    [diffStyle, themeType]
-  );
+    const startId = setTimeout(() => {
+      if (!active) return;
+      setIsPreloading(true);
+      setPrerenderedHTML(undefined);
 
-  const hasOpenCommentForm = pendingComment !== null;
+      preloadMultiFileDiff({
+        oldFile: oldWithCache,
+        newFile: newWithCache,
+        options: { diffStyle, overflow: 'scroll', themeType, expandUnchanged: false }
+      })
+        .then((result) => {
+          if (!active) return;
+          clearTimeout(timeoutId);
+          setPrerenderedHTML(result.prerenderedHTML);
+          setIsPreloading(false);
+          return;
+        })
+        .catch((error: unknown) => {
+          if (!active) return;
+          clearTimeout(timeoutId);
+          if (!(error instanceof Error && error.message.includes('aborted'))) {
+            console.warn('[DiffViewer] Preloading failed:', error);
+          }
+          setPrerenderedHTML(undefined);
+          setIsPreloading(false);
+        });
+    }, 0);
 
-  const options = useMemo(
-    () => ({
-      diffStyle,
-      overflow: 'scroll' as const,
-      themeType,
-      expandUnchanged: false,
-      enableHoverUtility: !hasOpenCommentForm && !!onAddComment,
-      enableLineSelection: !hasOpenCommentForm && !!onAddComment,
-      onLineSelectionEnd: (range: SelectedLineRange | null) => {
-        if (range === null || !onAddComment) return;
-        const derivedSide = range.endSide ?? range.side;
-        const side: AnnotationSide = derivedSide === 'deletions' ? 'deletions' : 'additions';
-        const endLine = Math.max(range.end, range.start);
-        const startLine = Math.min(range.end, range.start);
-        onAddComment(side, endLine, startLine === endLine ? undefined : startLine);
-      }
-    }),
-    [diffStyle, themeType, hasOpenCommentForm, onAddComment]
-  );
+    return () => {
+      active = false;
+      clearTimeout(startId);
+      clearTimeout(timeoutId);
+    };
+  }, [largeDiff, oldWithCache, newWithCache, diffStyle, themeType]);
+
+  const canInteract = !pendingComment && !!onAddComment;
+  const options = {
+    diffStyle,
+    overflow: 'scroll' as const,
+    themeType,
+    expandUnchanged: false,
+    enableHoverUtility: canInteract,
+    enableLineSelection: canInteract,
+    onLineSelectionEnd: (range: SelectedLineRange | null) => {
+      if (!range || !onAddComment) return;
+      const side: AnnotationSide =
+        (range.endSide ?? range.side) === 'deletions' ? 'deletions' : 'additions';
+      const lineNumber = Math.max(range.start, range.end);
+      const startLine = Math.min(range.start, range.end);
+      onAddComment(side, lineNumber, startLine === lineNumber ? undefined : startLine);
+    }
+  };
 
   const lineAnnotations = useMemo(() => {
-    const annotations: DiffLineAnnotation<AnnotationMetadata>[] = [];
-
-    for (const comment of comments) {
-      const line =
-        comment.anchor.type === 'orphaned' ? comment.anchor.last_known_line : comment.anchor.line;
-      annotations.push({
-        side: 'additions',
-        lineNumber: line,
-        metadata: { type: 'comment', comment }
-      });
-    }
+    const annotations: DiffLineAnnotation<AnnotationMetadata>[] = comments.map((comment) => ({
+      side: 'additions',
+      lineNumber:
+        comment.anchor.type === 'orphaned' ? comment.anchor.last_known_line : comment.anchor.line,
+      metadata: { type: 'comment', comment }
+    }));
 
     if (pendingComment) {
       annotations.push({
@@ -335,28 +245,27 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     if (!annotation.metadata) return null;
 
     if (annotation.metadata.type === 'form') {
-      const { startLine } = annotation.metadata;
+      const startLine = annotation.metadata.startLine;
       return (
         <CommentForm
           onSubmit={async (body) => {
-            if (onSubmitComment) {
-              await onSubmitComment(body, annotation.side, annotation.lineNumber, startLine);
-            }
+            if (!onSubmitComment) return;
+            await onSubmitComment(body, annotation.side, annotation.lineNumber, startLine);
           }}
           onCancel={() => onCancelComment?.()}
         />
       );
     }
 
-    const c = annotation.metadata.comment;
+    const comment = annotation.metadata.comment;
     return (
       <CommentDisplay
-        comment={c}
-        isEditing={editingCommentId === c.id}
+        comment={comment}
+        isEditing={editingCommentId === comment.id}
         onStartEdit={
           onStartEditComment
             ? () => {
-                onStartEditComment(c.id);
+                onStartEditComment(comment.id);
               }
             : undefined
         }
@@ -371,115 +280,35 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
     getHoveredLine: () => { lineNumber: number; side: AnnotationSide } | undefined
   ) => {
     if (!onAddComment) return null;
-
     return (
       <AddCommentButton
         onClick={() => {
           const hovered = getHoveredLine();
-          if (hovered) {
-            onAddComment(hovered.side, hovered.lineNumber);
-          }
+          if (hovered) onAddComment(hovered.side, hovered.lineNumber);
         }}
       />
     );
   };
 
-  useEffect(() => {
-    if (!large) {
-      return;
-    }
-
-    renderVersionRef.current += 1;
-    const currentVersion = renderVersionRef.current;
-
-    const abortController = new AbortController();
-    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- preload initialization, async results handled in callback
-    setIsPreloading(true);
-    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- clear stale prerendered HTML before new preload
-    setPrerenderedHTML(null);
-
-    async function preload() {
-      let isCancelled = false;
-
-      // Create abort promise that rejects when cleanup runs or timeout expires
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
-      const abortPromise = new Promise<never>((_, reject) => {
-        // Register abort listener first to ensure isCancelled is set before rejection
-        abortController.signal.addEventListener(
-          'abort',
-          () => {
-            isCancelled = true;
-            if (timeoutId !== undefined) clearTimeout(timeoutId);
-            reject(new Error('Preloading aborted'));
-          },
-          { once: true }
-        );
-
-        timeoutId = setTimeout(() => {
-          isCancelled = true;
-          reject(new Error(`Preloading timed out after ${PRELOAD_TIMEOUT_MS}ms`));
-        }, PRELOAD_TIMEOUT_MS);
-      });
-
-      try {
-        // Race preload against abort/timeout - abandon result if aborted
-        const result = await Promise.race([
-          preloadMultiFileDiff({
-            oldFile: oldFileWithCache,
-            newFile: newFileWithCache,
-            options: preloadOptions
-          }),
-          abortPromise
-        ]);
-
-        // Clear timeout on success to prevent memory leak
-        if (timeoutId !== undefined) clearTimeout(timeoutId);
-
-        // Only apply result if this is still the current render and not cancelled
-        if (!isCancelled && currentVersion === renderVersionRef.current) {
-          setPrerenderedHTML(result.prerenderedHTML);
-          setIsPreloading(false);
-        }
-      } catch (error) {
-        // Clear timeout to prevent memory leak
-        if (timeoutId !== undefined) clearTimeout(timeoutId);
-
-        // Skip logging for expected abort/timeout errors
-        const isAbortError =
-          error instanceof Error &&
-          (error.message.includes('aborted') || error.message.includes('timed out'));
-
-        if (!isAbortError) {
-          console.warn('[DiffViewer] Preloading failed, falling back to normal rendering:', error);
-        }
-
-        // Fall back to normal rendering if not cancelled
-        if (!isCancelled && currentVersion === renderVersionRef.current) {
-          setPrerenderedHTML(null);
-          setIsPreloading(false);
-        }
-      }
-    }
-
-    void preload();
-
-    return () => {
-      abortController.abort();
-    };
-  }, [large, oldFileWithCache, newFileWithCache, preloadOptions]);
-
-  // Show preloading state for large diffs
-  if (large && isPreloading) {
-    return <PreloadingState totalLines={totalLines} />;
+  if (largeDiff && isPreloading) {
+    return (
+      <CardState
+        title="Rendering large diff..."
+        subtitle={`${totalLines.toLocaleString()} lines`}
+        icon={ReloadIcon}
+        iconClass="animate-spin text-primary"
+        iconWrapClass="bg-primary/10"
+      />
+    );
   }
 
   return (
     <div className="flex-1 overflow-auto">
       <MultiFileDiff
-        oldFile={oldFileWithCache}
-        newFile={newFileWithCache}
+        oldFile={oldWithCache}
+        newFile={newWithCache}
         options={options}
-        prerenderedHTML={prerenderedHTML ?? undefined}
+        prerenderedHTML={largeDiff ? prerenderedHTML : undefined}
         lineAnnotations={lineAnnotations}
         selectedLines={selectedLines}
         renderAnnotation={renderAnnotation}
@@ -487,7 +316,7 @@ const PreloadedDiffViewer = memo(function PreloadedDiffViewer({
       />
     </div>
   );
-});
+}
 
 export function DiffViewer({
   oldFile,
@@ -497,46 +326,81 @@ export function DiffViewer({
   onRetry,
   isDark = false,
   diffStyle = 'split',
-  comments,
-  pendingComment,
-  editingCommentId,
-  selectedLines,
-  onAddComment,
-  onSubmitComment,
-  onCancelComment,
-  onUpdateComment,
-  onDeleteComment,
-  onStartEditComment,
-  onStopEditComment
+  ...review
 }: DiffViewerProps) {
-  if (isLoading) return <LoadingState />;
-  if (error !== null) return <ErrorState message={error} onRetry={onRetry} />;
-  if (!oldFile || !newFile) return <EmptyState />;
+  if (isLoading) {
+    return (
+      <CardState
+        title="Loading diff..."
+        icon={ReloadIcon}
+        iconClass="animate-spin text-primary"
+        iconWrapClass="bg-primary/10"
+      />
+    );
+  }
 
-  const hasBinary = oldFile.content?.type === 'binary' || newFile.content?.type === 'binary';
-  if (hasBinary) return <BinaryFileState oldFile={oldFile} newFile={newFile} />;
+  if (error !== null) {
+    return (
+      <CardState
+        title="Error loading diff"
+        subtitle={error}
+        icon={Alert02Icon}
+        iconClass="text-destructive"
+        iconWrapClass="bg-destructive/10 ring-1 ring-destructive/20"
+        action={
+          onRetry ? (
+            <button
+              onClick={onRetry}
+              className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Try again
+            </button>
+          ) : undefined
+        }
+      />
+    );
+  }
 
-  const convertedOldFile = toFileContents(oldFile);
-  const convertedNewFile = toFileContents(newFile);
+  if (!oldFile || !newFile) {
+    return (
+      <CardState
+        title="Select a file to view diff"
+        subtitle="Choose from the sidebar"
+        icon={File01Icon}
+        iconClass="text-muted-foreground"
+        iconWrapClass="bg-muted/50 ring-1 ring-border/50"
+      />
+    );
+  }
+
+  if (oldFile.content?.type === 'binary' || newFile.content?.type === 'binary') {
+    const oldSize = oldFile.content?.type === 'binary' ? oldFile.content.size : null;
+    const newSize = newFile.content?.type === 'binary' ? newFile.content.size : null;
+    const size =
+      oldSize !== null && newSize !== null && oldSize !== newSize
+        ? `${formatBytes(Number(oldSize))} -> ${formatBytes(Number(newSize))}`
+        : formatBytes(Number(newSize ?? oldSize ?? 0));
+    const ext = extension(newFile.name || oldFile.name);
+
+    return (
+      <CardState
+        role="status"
+        title="Binary content"
+        subtitle={ext ? `${ext} · ${size}` : size}
+        icon={File01Icon}
+        iconClass="text-muted-foreground"
+        iconWrapClass="bg-muted/50 ring-1 ring-border/50"
+      />
+    );
+  }
 
   return (
-    <PreloadedDiffViewer
-      key={`${convertedOldFile.name}:${convertedNewFile.name}`}
-      oldFile={convertedOldFile}
-      newFile={convertedNewFile}
+    <TextDiffViewer
+      oldFile={toFileContents(oldFile)}
+      newFile={toFileContents(newFile)}
       diffStyle={diffStyle}
       isDark={isDark}
-      comments={comments}
-      pendingComment={pendingComment}
-      editingCommentId={editingCommentId}
-      selectedLines={selectedLines}
-      onAddComment={onAddComment}
-      onSubmitComment={onSubmitComment}
-      onCancelComment={onCancelComment}
-      onUpdateComment={onUpdateComment}
-      onDeleteComment={onDeleteComment}
-      onStartEditComment={onStartEditComment}
-      onStopEditComment={onStopEditComment}
+      review={review}
     />
   );
 }

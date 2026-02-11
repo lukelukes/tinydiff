@@ -2,7 +2,7 @@ import type { AppMode } from '#core/app-mode';
 import type { ErrorInfo, ReactNode } from 'react';
 
 import { getAppMode } from '#core/app-mode';
-import { Component, useEffect, useRef, useState } from 'react';
+import { Component, useCallback, useEffect, useRef, useState } from 'react';
 
 import App from './app.tsx';
 import { ErrorDisplay } from './components/error-display.tsx';
@@ -44,14 +44,6 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 }
 
-function LoadingScreen() {
-  return (
-    <div className="flex h-full w-full flex-col items-center justify-center bg-background">
-      <div className="text-muted-foreground">Loading...</div>
-    </div>
-  );
-}
-
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; error: Error }
@@ -61,8 +53,7 @@ function AppLoader() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const mountedRef = useRef(true);
 
-  useEffect(() => {
-    mountedRef.current = true;
+  const load = useCallback(() => {
     getAppMode()
       .then((mode) => {
         if (mountedRef.current) setState({ status: 'ready', mode });
@@ -75,30 +66,28 @@ function AppLoader() {
           setState({ status: 'error', error });
         }
       });
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
     return () => {
       mountedRef.current = false;
     };
-  }, []);
+  }, [load]);
 
   const retry = () => {
     setState({ status: 'loading' });
-    getAppMode()
-      .then((mode) => {
-        if (mountedRef.current) setState({ status: 'ready', mode });
-        return;
-      })
-      .catch((e: unknown) => {
-        if (mountedRef.current) {
-          const error = e instanceof Error ? e : new Error(String(e));
-          console.error('Failed to load app mode:', error);
-          setState({ status: 'error', error });
-        }
-      });
+    load();
   };
 
   switch (state.status) {
     case 'loading':
-      return <LoadingScreen />;
+      return (
+        <div className="flex h-full w-full flex-col items-center justify-center bg-background">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      );
     case 'error':
       return <ErrorDisplay title="Failed to initialize" error={state.error} onRetry={retry} />;
     case 'ready':
