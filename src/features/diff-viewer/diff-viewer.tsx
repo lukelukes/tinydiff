@@ -4,8 +4,7 @@ import type { DiffLineAnnotation, FileContents } from '@pierre/diffs/react';
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { MultiFileDiff } from '@pierre/diffs/react';
-import { preloadMultiFileDiff } from '@pierre/diffs/ssr';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import type { Comment, DiffFile } from '../../../tauri-bindings';
 import type { PendingComment } from '../comments';
@@ -58,9 +57,6 @@ type TextDiffViewerProps = {
   review: ReviewProps;
 };
 
-const LARGE_DIFF_LINE_THRESHOLD = 500;
-const PRELOAD_TIMEOUT_MS = 10_000;
-
 const formatBytes = (bytes: number) =>
   bytes < 1024
     ? `${bytes} B`
@@ -78,8 +74,6 @@ const toFileContents = (file: DiffFile): FileContents => ({
   contents: file.content?.type === 'text' ? file.content.contents : '',
   lang: undefined
 });
-
-const lineCount = (content: string) => (content ? content.split('\n').length : 0);
 
 function hash(value: string): number {
   let result = 5381;
@@ -145,8 +139,6 @@ function TextDiffViewer({ oldFile, newFile, diffStyle, isDark, review }: TextDif
     onStopEditComment
   } = review;
 
-  const totalLines = lineCount(oldFile.contents) + lineCount(newFile.contents);
-  const largeDiff = totalLines > LARGE_DIFF_LINE_THRESHOLD;
   const key = cacheKey(oldFile, newFile, diffStyle, isDark);
   const [oldWithCache, newWithCache] = useMemo(
     () =>
@@ -157,52 +149,6 @@ function TextDiffViewer({ oldFile, newFile, diffStyle, isDark, review }: TextDif
     [oldFile, newFile, key]
   );
   const themeType = isDark ? ('dark' as const) : ('light' as const);
-
-  const [prerenderedHTML, setPrerenderedHTML] = useState<string>();
-  const [isPreloading, setIsPreloading] = useState(largeDiff);
-
-  useEffect(() => {
-    if (!largeDiff) return;
-
-    let active = true;
-    const timeoutId = setTimeout(() => {
-      if (active) setIsPreloading(false);
-    }, PRELOAD_TIMEOUT_MS);
-
-    const startId = setTimeout(() => {
-      if (!active) return;
-      setIsPreloading(true);
-      setPrerenderedHTML(undefined);
-
-      preloadMultiFileDiff({
-        oldFile: oldWithCache,
-        newFile: newWithCache,
-        options: { diffStyle, overflow: 'scroll', themeType, expandUnchanged: false }
-      })
-        .then((result) => {
-          if (!active) return;
-          clearTimeout(timeoutId);
-          setPrerenderedHTML(result.prerenderedHTML);
-          setIsPreloading(false);
-          return;
-        })
-        .catch((error: unknown) => {
-          if (!active) return;
-          clearTimeout(timeoutId);
-          if (!(error instanceof Error && error.message.includes('aborted'))) {
-            console.warn('[DiffViewer] Preloading failed:', error);
-          }
-          setPrerenderedHTML(undefined);
-          setIsPreloading(false);
-        });
-    }, 0);
-
-    return () => {
-      active = false;
-      clearTimeout(startId);
-      clearTimeout(timeoutId);
-    };
-  }, [largeDiff, oldWithCache, newWithCache, diffStyle, themeType]);
 
   const canInteract = !pendingComment && !!onAddComment;
   const options = {
@@ -290,25 +236,12 @@ function TextDiffViewer({ oldFile, newFile, diffStyle, isDark, review }: TextDif
     );
   };
 
-  if (largeDiff && isPreloading) {
-    return (
-      <CardState
-        title="Rendering large diff..."
-        subtitle={`${totalLines.toLocaleString()} lines`}
-        icon={ReloadIcon}
-        iconClass="animate-spin text-primary"
-        iconWrapClass="bg-primary/10"
-      />
-    );
-  }
-
   return (
     <div className="flex-1 overflow-auto">
       <MultiFileDiff
         oldFile={oldWithCache}
         newFile={newWithCache}
         options={options}
-        prerenderedHTML={largeDiff ? prerenderedHTML : undefined}
         lineAnnotations={lineAnnotations}
         selectedLines={selectedLines}
         renderAnnotation={renderAnnotation}
