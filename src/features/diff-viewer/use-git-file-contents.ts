@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
   commands,
@@ -20,44 +20,39 @@ export function useGitFileContents(
 ) {
   const [state, setState] = useState<GitFileContentsState>({ status: 'idle' });
 
-  const refresh = async () => {
-    if (filePath === null || target === null) {
-      setState({ status: 'idle' });
-      return;
-    }
-    setState({ status: 'loading' });
-    const result = await commands.getGitFileContents(repoPath, filePath, target);
-    if (result.status === 'ok') {
-      setState({ status: 'success', data: result.data });
-    } else {
-      setState({ status: 'error', error: result.error });
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
+  const load = useCallback(
+    async (canApply: () => boolean = () => true) => {
       if (filePath === null || target === null) {
-        setState({ status: 'idle' });
+        if (canApply()) setState({ status: 'idle' });
         return;
       }
-      setState({ status: 'loading' });
+      if (canApply()) setState({ status: 'loading' });
       const result = await commands.getGitFileContents(repoPath, filePath, target);
-      if (cancelled) return;
-      if (result.status === 'ok') {
-        setState({ status: 'success', data: result.data });
-      } else {
-        setState({ status: 'error', error: result.error });
-      }
-    }
+      if (!canApply()) return;
+      setState(
+        result.status === 'ok'
+          ? { status: 'success', data: result.data }
+          : { status: 'error', error: result.error }
+      );
+    },
+    [repoPath, filePath, target]
+  );
 
-    void load();
+  const refresh = useCallback(async () => {
+    await load();
+  }, [load]);
+
+  useEffect(() => {
+    let active = true;
+    const timeoutId = setTimeout(() => {
+      void load(() => active);
+    }, 0);
 
     return () => {
-      cancelled = true;
+      active = false;
+      clearTimeout(timeoutId);
     };
-  }, [repoPath, filePath, target]);
+  }, [load]);
 
   return { state, refresh };
 }

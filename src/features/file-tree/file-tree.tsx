@@ -40,11 +40,13 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
       onSelectFile
     });
 
-  // Wrap keyboard handler to ensure container stays focused during navigation
-  const onKeyDown = (e: React.KeyboardEvent) => {
-    handleKeyDown(e);
-    // Keep focus on container for continued keyboard navigation
-    containerRef.current?.focus();
+  const treeItemProps = {
+    selectedFile,
+    onSelectFile,
+    focusedPath,
+    setFocusedPath,
+    expandedPaths,
+    toggleExpanded
   };
 
   if (tree.length === 0) {
@@ -52,19 +54,17 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   }
 
   return (
-    <SidebarMenu ref={containerRef} tabIndex={0} onKeyDown={onKeyDown} className="outline-none">
+    <SidebarMenu
+      ref={containerRef}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        handleKeyDown(e);
+        containerRef.current?.focus();
+      }}
+      className="outline-none"
+    >
       {tree.map((node) => (
-        <TreeItem
-          key={node.path}
-          node={node}
-          selectedFile={selectedFile}
-          onSelectFile={onSelectFile}
-          focusedPath={focusedPath}
-          setFocusedPath={setFocusedPath}
-          expanded={node.type === 'directory' ? expandedPaths.has(node.path) : false}
-          expandedPaths={expandedPaths}
-          toggleExpanded={toggleExpanded}
-        />
+        <TreeItem key={node.path} node={node} {...treeItemProps} />
       ))}
     </SidebarMenu>
   );
@@ -76,10 +76,11 @@ interface TreeItemProps {
   onSelectFile: (path: string, target: DiffTarget) => void;
   focusedPath: string | null;
   setFocusedPath: (path: string | null) => void;
-  expanded: boolean;
   expandedPaths: Set<string>;
   toggleExpanded: (path: string) => void;
 }
+
+type TreeItemSharedProps = Omit<TreeItemProps, 'node'>;
 
 function TreeItem({
   node,
@@ -87,14 +88,16 @@ function TreeItem({
   onSelectFile,
   focusedPath,
   setFocusedPath,
-  expanded,
   expandedPaths,
   toggleExpanded
 }: TreeItemProps) {
   const isFocused = focusedPath === node.path;
+  const focus = () => {
+    setFocusedPath(node.path);
+  };
 
   const handleClick = () => {
-    setFocusedPath(node.path);
+    focus();
     if (node.type === 'file') {
       const target: DiffTarget = node.isStaged ? 'staged' : 'unstaged';
       onSelectFile(node.path, target);
@@ -102,7 +105,7 @@ function TreeItem({
   };
 
   const handleToggle = () => {
-    setFocusedPath(node.path);
+    focus();
     toggleExpanded(node.path);
   };
 
@@ -137,7 +140,16 @@ function TreeItem({
     );
   }
 
-  // Directory node - use the pre-computed `expanded` prop
+  const expanded = expandedPaths.has(node.path);
+  const childTreeItemProps: TreeItemSharedProps = {
+    selectedFile,
+    onSelectFile,
+    focusedPath,
+    setFocusedPath,
+    expandedPaths,
+    toggleExpanded
+  };
+
   return (
     <SidebarMenuItem>
       <Collapsible
@@ -165,17 +177,7 @@ function TreeItem({
         <CollapsibleContent>
           <SidebarMenuSub className="pl-5">
             {node.children.map((child) => (
-              <TreeItem
-                key={child.path}
-                node={child}
-                selectedFile={selectedFile}
-                onSelectFile={onSelectFile}
-                focusedPath={focusedPath}
-                setFocusedPath={setFocusedPath}
-                expanded={child.type === 'directory' ? expandedPaths.has(child.path) : false}
-                expandedPaths={expandedPaths}
-                toggleExpanded={toggleExpanded}
-              />
+              <TreeItem key={child.path} node={child} {...childTreeItemProps} />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>

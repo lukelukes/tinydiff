@@ -6,20 +6,19 @@ export interface FlatNode {
   parentPath: string | null;
 }
 
-export function getAllDirectoryPaths(nodes: FileTreeNode[]): Set<string> {
-  const paths = new Set<string>();
-
-  function walk(nodes: FileTreeNode[]) {
-    for (const node of nodes) {
-      if (node.type === 'directory') {
-        paths.add(node.path);
-        walk(node.children);
-      }
+function walkTree(
+  nodes: FileTreeNode[],
+  onNode: (node: FileTreeNode, depth: number, parentPath: string | null) => void,
+  shouldDescend: (node: FileTreeNode) => boolean = (node) => node.type === 'directory',
+  depth = 0,
+  parentPath: string | null = null
+): void {
+  for (const node of nodes) {
+    onNode(node, depth, parentPath);
+    if (node.type === 'directory' && shouldDescend(node)) {
+      walkTree(node.children, onNode, shouldDescend, depth + 1, node.path);
     }
   }
-
-  walk(nodes);
-  return paths;
 }
 
 export function flattenTree(
@@ -29,47 +28,38 @@ export function flattenTree(
   parentPath: string | null = null
 ): FlatNode[] {
   const result: FlatNode[] = [];
-
-  for (const node of nodes) {
-    result.push({ node, depth, parentPath });
-
-    if (node.type === 'directory' && !collapsedPaths.has(node.path)) {
-      result.push(...flattenTree(node.children, collapsedPaths, depth + 1, node.path));
-    }
-  }
-
+  walkTree(
+    nodes,
+    (node, currentDepth, currentParentPath) => {
+      result.push({ node, depth: currentDepth, parentPath: currentParentPath });
+    },
+    (node) => node.type === 'directory' && !collapsedPaths.has(node.path),
+    depth,
+    parentPath
+  );
   return result;
+}
+
+export function getAllDirectoryPaths(nodes: FileTreeNode[]): Set<string> {
+  const paths = new Set<string>();
+  walkTree(nodes, (node) => {
+    if (node.type === 'directory') paths.add(node.path);
+  });
+  return paths;
 }
 
 export function getAllFilePaths(nodes: FileTreeNode[]): string[] {
   const paths: string[] = [];
-
-  function walk(nodes: FileTreeNode[]) {
-    for (const node of nodes) {
-      if (node.type === 'file') {
-        paths.push(node.path);
-      } else {
-        walk(node.children);
-      }
-    }
-  }
-
-  walk(nodes);
+  walkTree(nodes, (node) => {
+    if (node.type === 'file') paths.push(node.path);
+  });
   return paths;
 }
 
 export function getAllPaths(nodes: FileTreeNode[]): string[] {
   const paths: string[] = [];
-
-  function walk(nodes: FileTreeNode[]) {
-    for (const node of nodes) {
-      paths.push(node.path);
-      if (node.type === 'directory') {
-        walk(node.children);
-      }
-    }
-  }
-
-  walk(nodes);
+  walkTree(nodes, (node) => {
+    paths.push(node.path);
+  });
   return paths;
 }

@@ -216,11 +216,6 @@ function GitMode({ path }: { path: string }) {
     setSelectedLines(null);
   };
 
-  const handleCancelComment = () => {
-    closeCommentForm();
-    setSelectedLines(null);
-  };
-
   const handleUpdateComment = async (comment: Comment) => {
     const newFileContent =
       fileContentsState.status === 'success' &&
@@ -232,10 +227,6 @@ function GitMode({ path }: { path: string }) {
     if (!result.success) {
       console.error('Failed to update comment:', result.error);
     }
-  };
-
-  const handleDeleteComment = async (commentId: string) => {
-    await deleteComment(commentId);
   };
 
   const diffViewerProps =
@@ -254,14 +245,8 @@ function GitMode({ path }: { path: string }) {
             fileContentsState.status === 'error' ? getErrorMessage(fileContentsState.error) : null
         };
 
-  const handleRetry = () => {
-    void refreshFileContents();
-  };
-
-  // Get folder name from path
   const folderName = path.split('/').pop() ?? path;
 
-  // Count changes
   const changeCount =
     state.status === 'success'
       ? state.data.staged.length + state.data.unstaged.length + state.data.untracked.length
@@ -374,11 +359,10 @@ function GitMode({ path }: { path: string }) {
           </div>
         </header>
 
-        {/* Main content */}
         <div className="flex flex-1 overflow-hidden">
           <DiffViewer
             {...diffViewerProps}
-            onRetry={handleRetry}
+            onRetry={() => void refreshFileContents()}
             isDark={isDark}
             diffStyle={diffStyle}
             comments={fileComments}
@@ -387,9 +371,14 @@ function GitMode({ path }: { path: string }) {
             selectedLines={selectedLines}
             onAddComment={handleAddComment}
             onSubmitComment={handleSubmitComment}
-            onCancelComment={handleCancelComment}
+            onCancelComment={() => {
+              closeCommentForm();
+              setSelectedLines(null);
+            }}
             onUpdateComment={handleUpdateComment}
-            onDeleteComment={handleDeleteComment}
+            onDeleteComment={async (id) => {
+              await deleteComment(id);
+            }}
             onStartEditComment={startEditing}
             onStopEditComment={stopEditing}
           />
