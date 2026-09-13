@@ -2,20 +2,11 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, session, shell } from 'electron';
 
-import { RENDERER_ORIGIN } from './csp';
+import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
 import { applyDevCsp, serveRenderer } from './protocol';
 
 const rendererUrl = process.env.ELECTRON_RENDERER_URL;
-const allowedOrigins = new Set([
-  RENDERER_ORIGIN,
-  ...(rendererUrl ? [new URL(rendererUrl).origin] : [])
-]);
-
-app.setName('tinydiff');
-
-if (!app.requestSingleInstanceLock()) {
-  app.exit(0);
-}
+const devOrigin = rendererUrl ? new URL(rendererUrl).origin : null;
 
 let mainWindow: BrowserWindow | null = null;
 let rendererReloaded = false;
@@ -36,6 +27,13 @@ function originOf(url: string): string | null {
   }
 }
 
+function isAllowedNavigation(url: string): boolean {
+  if (url.startsWith(`${RENDERER_ORIGIN}/`)) {
+    return true;
+  }
+  return devOrigin !== null && originOf(url) === devOrigin;
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1024,
@@ -54,8 +52,7 @@ function createWindow(): BrowserWindow {
   win.once('ready-to-show', () => win.show());
 
   win.webContents.on('will-navigate', (event) => {
-    const origin = originOf(event.url);
-    if (origin === null || !allowedOrigins.has(origin)) {
+    if (!isAllowedNavigation(event.url)) {
       event.preventDefault();
     }
   });
@@ -85,45 +82,55 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
-app.on('second-instance', (_event, argv, workingDirectory) => {
-  log(`second instance launched in ${workingDirectory} with ${JSON.stringify(argv)}`);
-  focusMainWindow();
-});
+function bootstrap(): void {
+  app.on('second-instance', (_event, argv, workingDirectory) => {
+    log(`second instance launched in ${workingDirectory} with ${JSON.stringify(argv)}`);
+    focusMainWindow();
+  });
 
-app.on('render-process-gone', (_event, contents, details) => {
-  log(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`);
-  if (details.reason === 'clean-exit' || details.reason === 'killed' || rendererReloaded) {
-    return;
-  }
-  rendererReloaded = true;
-  contents.reload();
-});
+  app.on('render-process-gone', (_event, contents, details) => {
+    log(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`);
+    if (details.reason === 'clean-exit' || details.reason === 'killed' || rendererReloaded) {
+      return;
+    }
+    rendererReloaded = true;
+    contents.reload();
+  });
 
-app.on('child-process-gone', (_event, details) => {
-  log(
-    `${details.type} process${details.name ? ` ${details.name}` : ''} gone: ${details.reason} (exit code ${details.exitCode})`
-  );
-});
+  app.on('child-process-gone', (_event, details) => {
+    log(
+      `${details.type} process${details.name ? ` ${details.name}` : ''} gone: ${details.reason} (exit code ${details.exitCode})`
+    );
+  });
 
-process.on('uncaughtException', (error) => {
-  log(`uncaught exception: ${error.stack ?? error.message}`);
-});
+  process.on('uncaughtException', (error) => {
+    log(`uncaught exception: ${error.stack ?? error.message}`);
+  });
 
-app.on('window-all-closed', () => {
-  app.quit();
-});
+  app.on('window-all-closed', () => {
+    app.quit();
+  });
 
-void app.whenReady().then(() => {
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
-    callback(false)
-  );
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  void app.whenReady().then(() => {
+    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
+      callback(false)
+    );
+    session.defaultSession.setPermissionCheckHandler(() => false);
 
-  if (rendererUrl) {
-    applyDevCsp();
-  } else {
-    serveRenderer(join(import.meta.dirname, '../renderer'));
-  }
+    if (rendererUrl) {
+      applyDevCsp(process.env[DEV_CSP_NONCE_ENV]);
+    } else {
+      serveRenderer(join(import.meta.dirname, '../renderer'));
+    }
 
-  mainWindow = createWindow();
-});
+    mainWindow = createWindow();
+  });
+}
+
+app.setName('tinydiff');
+
+if (app.requestSingleInstanceLock()) {
+  bootstrap();
+} else {
+  app.exit(0);
+}
