@@ -1,3 +1,4 @@
+pub mod app;
 pub mod comments;
 pub mod error;
 pub mod fs;
@@ -5,6 +6,7 @@ pub mod git;
 pub mod git_async;
 pub mod types;
 
+pub use app::{AppMode, CommandError, resolve_app_mode};
 pub use comments::{
     delete_comment, get_comments_for_file, load_comments, re_anchor_comment, save_comment,
 };
