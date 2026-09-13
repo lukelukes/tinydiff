@@ -2,7 +2,13 @@
   "name": "tinydiff",
   "version": "0.1.0",
   "private": true,
+  "description": "View Git diffs and perform code reviews",
+  "homepage": "https://github.com/lukelukes/tinydiff",
   "license": "MIT",
+  "author": {
+    "name": "Luke Lukes",
+    "email": "126602706+lukelukes@users.noreply.github.com"
+  },
   "type": "module",
   "main": "./out/main/index.js",
   "imports": {
@@ -27,6 +33,7 @@
     "lint:node": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.node.json vite.config.ts vite.renderer.ts vitest.config.ts electron.vite.config.ts",
     "lint:renderer": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.json src public dev",
     "napi:build": "napi build --release --manifest-path crates/tinydiff-napi/Cargo.toml --output-dir crates/tinydiff-napi --dts-header \"import type { AppMode, Comment, CommandError, CommentCollection, DiffTarget, FileDiff, GitFileContents, GitStatus, ReadFileResult, Result } from '../../src/bindings/types';\"",
+    "package": "electron-builder --linux",
     "postinstall": "install-electron",
     "test": "vitest --run --project unit --project property --project browser",
     "test:browser": "bun vitest run --project browser",
@@ -63,6 +70,7 @@
     "clsx": "2.1.1",
     "concurrently": "9.2.1",
     "electron": "44.3.0",
+    "electron-builder": "26.15.3",
     "electron-vite": "6.0.0-beta.1",
     "fast-check": "4.6.0",
     "knip": "6.0.6",

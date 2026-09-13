@@ -1,0 +1,28 @@
+appId: com.lukelukes.tinydiff
+productName: TinyDiff
+executableName: tinydiff
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - package.json
+asarUnpack:
+  - out/main/chunks/*.node
+extraResources: []
+npmRebuild: false
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  onlyLoadAppFromAsar: true
+  grantFileProtocolExtraPrivileges: false
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  icon: build/icon.png
+  maintainer: Luke Lukes <126602706+lukelukes@users.noreply.github.com>
+  artifactName: ${productName}-${version}-${arch}.${ext}
