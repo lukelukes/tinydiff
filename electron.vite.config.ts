@@ -32,6 +32,9 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => ({
     root: '.',
     plugins: await rendererPlugins(),
     html: command === 'serve' ? { cspNonce: devCspNonce() } : undefined,
-    build: { rollupOptions: { input: { index: resolve(root, 'index.html') } } }
+    build: {
+      ...rendererOptions.build,
+      rollupOptions: { input: { index: resolve(root, 'index.html') } }
+    }
   }
 }));

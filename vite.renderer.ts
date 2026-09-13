@@ -47,5 +47,6 @@ export async function rendererPlugins(): Promise<PluginOption[]> {
 
 export const rendererOptions = {
   clearScreen: false,
+  build: { assetsInlineLimit: 0 },
   worker: { format: 'es' }
 } satisfies UserConfig;
