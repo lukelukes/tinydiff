@@ -39,7 +39,7 @@ const commentsData: CommentCollection = {
     },
     {
       id: 'comment-3',
-      filePath: 'src-tauri/src/comments.rs',
+      filePath: 'crates/tinydiff-core/src/comments.rs',
       anchor: { type: 'pinned', line: 28 },
       body: 'Nice use of the builder pattern here!',
       resolved: false,

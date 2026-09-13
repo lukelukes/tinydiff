@@ -5,7 +5,7 @@ export const mockGitStatus: GitStatus = {
     { path: 'src/features/diff-viewer/diff-viewer.tsx', kind: { status: 'modified' } },
     { path: 'src/features/comments/comment-components.tsx', kind: { status: 'modified' } },
     { path: 'src/lib/settings-store.ts', kind: { status: 'added' } },
-    { path: 'src-tauri/src/comments.rs', kind: { status: 'modified' } },
+    { path: 'crates/tinydiff-core/src/comments.rs', kind: { status: 'modified' } },
     {
       path: 'src/utils/old-helpers.ts',
       kind: { status: 'renamed', old_path: 'src/utils/helpers.ts' }
