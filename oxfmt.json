@@ -15,5 +15,13 @@
     "stylesheet": "./src/styles/main.css"
   },
 
-  "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "**/*.toml", "**/*.md"]
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "tauri-bindings",
+    "src/bindings/types.ts",
+    "crates/tinydiff-napi/index.d.ts",
+    "**/*.toml",
+    "**/*.md"
+  ]
 }

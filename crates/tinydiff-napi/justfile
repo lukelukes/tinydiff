@@ -1,0 +1,40 @@
+set quiet
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+pkg := "tinydiff-napi"
+dts_header := "import type { AppMode, Comment, CommandError, CommentCollection, DiffTarget, FileDiff, GitFileContents, GitStatus, ReadFileResult, Result } from '../../src/bindings/types';"
+
+[group('check')]
+fmt:
+    cargo fmt -p {{ pkg }}
+
+[group('check')]
+fmt-check:
+    cargo fmt -p {{ pkg }} -- --check
+
+[group('check')]
+clippy:
+    cargo clippy -p {{ pkg }} -- -D warnings
+
+[group('check')]
+test:
+    cargo test -p {{ pkg }}
+
+[group('check')]
+[parallel]
+check: fmt clippy test
+
+[group('build')]
+[no-cd]
+build:
+    bunx napi build --release --manifest-path crates/tinydiff-napi/Cargo.toml --output-dir crates/tinydiff-napi --dts-header "{{ dts_header }}"
+
+[group('build')]
+[no-cd]
+types:
+    cargo run -p tinydiff-core --example export-types --features specta
+
+[group('build')]
+[no-cd]
+types-check: types
+    git diff --exit-code src/bindings/types.ts
