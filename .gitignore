@@ -7,3 +7,7 @@ tsconfig.node.tsbuildinfo
 .idea/
 .claude/
 .opencode/
+out/
+release/
+crates/tinydiff-napi/*.node
+**/__screenshots__/
