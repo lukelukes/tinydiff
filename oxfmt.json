@@ -4,12 +4,15 @@
   "singleQuote": true,
   "trailingComma": "none",
 
-  "experimentalSortImports": {
-    "sortOrder": "source"
+  "sortImports": true,
+
+  "sortPackageJson": {
+    "sortScripts": true
   },
 
-  "experimentalSortPackageJson": {
-    "sortScripts": true
+  "sortTailwindcss": {
+    "functions": ["cn", "cva"],
+    "stylesheet": "./src/styles/main.css"
   },
 
   "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "**/*.toml", "**/*.md"]

@@ -7,12 +7,6 @@
     "suspicious": "error"
   },
   "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "src/vite-env.d.ts", "*.config.*"],
-  "jsPlugins": [
-    {
-      "name": "react-hooks-js",
-      "specifier": "eslint-plugin-react-hooks"
-    }
-  ],
   "plugins": [
     "oxc",
     "typescript",
@@ -25,38 +19,71 @@
     "vitest"
   ],
   "rules": {
-    "typescript/strict-boolean-expressions": "off",
     "import/max-dependencies": "off",
+    "import/newline-after-import": "error",
     "import/no-unassigned-import": [
       "error",
       {
         "allow": ["**/*.css"]
       }
     ],
+    "logical-assignment-operators": "error",
     "max-lines": "off",
     "max-lines-per-function": "off",
     "no-useless-return": "off",
     "no-warning-comments": "off",
-    "react-hooks-js/component-hook-factories": "error",
-    "react-hooks-js/config": "error",
-    "react-hooks-js/error-boundaries": "error",
-    "react-hooks-js/gating": "error",
-    "react-hooks-js/globals": "error",
-    "react-hooks-js/immutability": "error",
-    "react-hooks-js/incompatible-library": "warn",
-    "react-hooks-js/preserve-manual-memoization": "error",
-    "react-hooks-js/purity": "error",
-    "react-hooks-js/refs": "error",
-    "react-hooks-js/set-state-in-effect": "error",
-    "react-hooks-js/set-state-in-render": "error",
-    "react-hooks-js/static-components": "error",
-    "react-hooks-js/unsupported-syntax": "warn",
-    "react-hooks-js/use-memo": "error",
+    "object-shorthand": "error",
+    "prefer-arrow-callback": "error",
     "react-perf/jsx-no-jsx-as-prop": "off",
     "react-perf/jsx-no-new-function-as-prop": "off",
     "react-perf/jsx-no-new-object-as-prop": "off",
+    "react/jsx-boolean-value": "error",
+    "react/jsx-curly-brace-presence": "error",
+    "react/jsx-fragments": "error",
+    "react/memo-dependencies": "off",
+    "react/only-export-components": "error",
     "react/react-in-jsx-scope": "off",
-    "unicorn/prefer-query-selector": "off"
+    "react/self-closing-comp": "error",
+    "typescript/consistent-return": "off",
+    "typescript/consistent-type-exports": "error",
+    "typescript/dot-notation": "error",
+    "typescript/method-signature-style": ["error", "property"],
+    "typescript/no-unnecessary-qualifier": "error",
+    "typescript/prefer-find": "error",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/strict-boolean-expressions": "off",
+    "unicorn/consistent-template-literal-escape": "error",
+    "unicorn/explicit-timer-delay": "error",
+    "unicorn/prefer-query-selector": "off",
+    "vitest/consistent-test-it": ["error", { "fn": "it" }],
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": ["expect", "expectTypeOf", "assert", "assertType", "fc.assert"]
+      }
+    ],
+    "vitest/no-alias-methods": "error",
+    "vitest/no-duplicate-hooks": "error",
+    "vitest/no-identical-title": "error",
+    "vitest/no-test-return-statement": "error",
+    "vitest/no-unneeded-async-expect-function": "error",
+    "vitest/prefer-comparison-matcher": "error",
+    "vitest/prefer-equality-matcher": "error",
+    "vitest/prefer-expect-resolves": "error",
+    "vitest/prefer-hooks-in-order": "error",
+    "vitest/prefer-hooks-on-top": "error",
+    "vitest/prefer-importing-vitest-globals": "error",
+    "vitest/prefer-mock-promise-shorthand": "error",
+    "vitest/prefer-mock-return-shorthand": "error",
+    "vitest/prefer-spy-on": "error",
+    "vitest/prefer-strict-equal": "error",
+    "vitest/prefer-to-be": "error",
+    "vitest/prefer-to-contain": "error",
+    "vitest/prefer-to-have-been-called-times": "error",
+    "vitest/prefer-to-have-length": "error",
+    "vitest/prefer-todo": "error",
+    "vitest/require-top-level-describe": "error"
   },
   "settings": {
     "react": {
