@@ -10,6 +10,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { TinydiffApi } from '#bindings/index';
 
+import type { PackagedBinary } from './packaged-binary';
+import { inspectablePackagedBinary } from './packaged-binary';
+
 declare global {
   interface Window {
     tinydiff: TinydiffApi;
@@ -61,8 +64,11 @@ function createRepo(): string {
   return dir;
 }
 
-function launch(repoDir: string, configDir: string): Promise<ElectronApplication> {
-  const executablePath = process.env.TD_E2E_BINARY;
+function launch(
+  repoDir: string,
+  configDir: string,
+  executablePath: string | undefined
+): Promise<ElectronApplication> {
   return electron.launch({
     ...(executablePath ? { executablePath } : {}),
     args: executablePath ? [repoDir] : [resolve('out/main/index.js'), repoDir],
@@ -120,6 +126,7 @@ function clickBlankAnchor(target: Page, href: string): Promise<void> {
 describe('tinydiff electron app', () => {
   let repoDir: string;
   let configDir: string;
+  let binary: PackagedBinary | null = null;
   let app: ElectronApplication;
   let page: Page;
   let closed = false;
@@ -127,7 +134,9 @@ describe('tinydiff electron app', () => {
   beforeAll(async () => {
     repoDir = createRepo();
     configDir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-config-'));
-    app = await launch(repoDir, configDir);
+    const packaged = process.env.TD_E2E_BINARY;
+    binary = packaged ? await inspectablePackagedBinary(packaged) : null;
+    app = await launch(repoDir, configDir, binary?.executablePath);
     await stubOpenExternal(app);
     page = await app.firstWindow();
   });
@@ -136,6 +145,7 @@ describe('tinydiff electron app', () => {
     if (!closed) {
       await app.close();
     }
+    binary?.dispose();
     rmSync(repoDir, { recursive: true, force: true });
     rmSync(configDir, { recursive: true, force: true });
   });
@@ -259,7 +269,7 @@ describe('tinydiff electron app', () => {
     });
 
     writeFileSync(stateFile, JSON.stringify({ bounds: OFFSCREEN_BOUNDS, maximized: false }));
-    const restarted = await launch(repoDir, configDir);
+    const restarted = await launch(repoDir, configDir, binary?.executablePath);
     try {
       await restarted.firstWindow();
       const area = await workArea(restarted);
