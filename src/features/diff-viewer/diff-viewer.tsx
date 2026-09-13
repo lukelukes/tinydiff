@@ -1,18 +1,17 @@
-import type { SelectedLineRange } from '@pierre/diffs';
-import type { DiffLineAnnotation, FileContents } from '@pierre/diffs/react';
-
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { MultiFileDiff } from '@pierre/diffs/react';
+import type { SelectedLineRange } from '@pierre/diffs';
+import type { DiffLineAnnotation, FileContents, MultiFileDiffProps } from '@pierre/diffs/react';
+import { MultiFileDiff, Virtualizer } from '@pierre/diffs/react';
 import { useMemo } from 'react';
 
+import { getErrorMessage } from '#core/command-error';
+
 import type { Comment, DiffFile } from '../../../tauri-bindings';
-import type { PendingComment } from '../comments';
-import type { DiffStyle } from './diff-view-provider';
-
-import { AddCommentButton, CommentDisplay, CommentForm } from '../comments';
-
-type AnnotationSide = 'deletions' | 'additions';
+import type { CommentFormState, CommentSide } from '../comments';
+import { AddCommentButton, CommentDisplay, CommentForm, useReview } from '../comments';
+import type { DiffStyle } from './diff-view-context';
+import type { GitFileContentsState } from './use-git-file-contents';
 
 export type { SelectedLineRange };
 
@@ -20,41 +19,40 @@ type AnnotationMetadata =
   | { type: 'comment'; comment: Comment }
   | { type: 'form'; startLine?: number };
 
-type ReviewProps = {
-  comments?: Comment[];
-  pendingComment?: PendingComment | null;
-  editingCommentId?: string | null;
-  selectedLines?: SelectedLineRange | null;
-  onAddComment?: (side: AnnotationSide, lineNumber: number, startLine?: number) => void;
-  onSubmitComment?: (
-    body: string,
-    side: AnnotationSide,
-    lineNumber: number,
-    startLine?: number
-  ) => Promise<void>;
-  onCancelComment?: () => void;
-  onUpdateComment?: (comment: Comment) => Promise<void>;
-  onDeleteComment?: (commentId: string) => Promise<void>;
-  onStartEditComment?: (commentId: string) => void;
-  onStopEditComment?: () => void;
+type DiffProps = MultiFileDiffProps<AnnotationMetadata, undefined>;
+type DiffOptions = NonNullable<DiffProps['options']>;
+
+type ReviewData = {
+  comments: Comment[];
+  form: CommentFormState;
+  selectedLines: SelectedLineRange | null;
 };
 
-type DiffViewerProps = ReviewProps & {
-  oldFile: DiffFile | null;
-  newFile: DiffFile | null;
-  isLoading: boolean;
-  error: string | null;
+type DiffViewerProps = {
+  state: GitFileContentsState;
   onRetry?: () => void;
   isDark?: boolean;
   diffStyle?: DiffStyle;
+  review?: ReviewData;
 };
 
-type TextDiffViewerProps = {
+type TextDiffProps = {
   oldFile: FileContents;
   newFile: FileContents;
   diffStyle: DiffStyle;
   isDark: boolean;
-  review: ReviewProps;
+  options?: Partial<DiffOptions>;
+  lineAnnotations?: DiffProps['lineAnnotations'];
+  selectedLines?: DiffProps['selectedLines'];
+  renderAnnotation?: DiffProps['renderAnnotation'];
+  renderGutterUtility?: DiffProps['renderGutterUtility'];
+};
+
+type ReviewTextDiffProps = Omit<
+  TextDiffProps,
+  'options' | 'lineAnnotations' | 'selectedLines' | 'renderAnnotation' | 'renderGutterUtility'
+> & {
+  review: ReviewData;
 };
 
 const formatBytes = (bytes: number) =>
@@ -97,7 +95,7 @@ function CardState({
   icon,
   iconClass,
   iconWrapClass,
-  role,
+  as: Tag = 'div',
   action
 }: {
   title: string;
@@ -105,11 +103,11 @@ function CardState({
   icon: typeof File01Icon;
   iconClass: string;
   iconWrapClass: string;
-  role?: string;
+  as?: 'div' | 'output';
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-1 items-center justify-center" role={role}>
+    <Tag className="flex flex-1 items-center justify-center">
       <div className="mx-auto grid place-items-center text-center">
         <div
           className={`mb-4 flex h-12 w-12 items-center justify-center rounded-xl ${iconWrapClass}`}
@@ -120,51 +118,113 @@ function CardState({
         {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
         {action}
       </div>
-    </div>
+    </Tag>
   );
 }
 
-function TextDiffViewer({ oldFile, newFile, diffStyle, isDark, review }: TextDiffViewerProps) {
-  const {
-    comments = [],
-    pendingComment,
-    editingCommentId,
-    selectedLines,
-    onAddComment,
-    onSubmitComment,
-    onCancelComment,
-    onUpdateComment,
-    onDeleteComment,
-    onStartEditComment,
-    onStopEditComment
-  } = review;
+function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <CardState
+      title="Error loading diff"
+      subtitle={message}
+      icon={Alert02Icon}
+      iconClass="text-destructive"
+      iconWrapClass="bg-destructive/10 ring-1 ring-destructive/20"
+      action={
+        onRetry ? (
+          <button
+            onClick={onRetry}
+            className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Try again
+          </button>
+        ) : undefined
+      }
+    />
+  );
+}
 
+function BinaryState({ oldFile, newFile }: { oldFile: DiffFile; newFile: DiffFile }) {
+  const oldSize = oldFile.content?.type === 'binary' ? oldFile.content.size : null;
+  const newSize = newFile.content?.type === 'binary' ? newFile.content.size : null;
+  const size =
+    oldSize !== null && newSize !== null && oldSize !== newSize
+      ? `${formatBytes(oldSize)} -> ${formatBytes(newSize)}`
+      : formatBytes(newSize ?? oldSize ?? 0);
+  const ext = extension(newFile.name || oldFile.name);
+
+  return (
+    <CardState
+      as="output"
+      title="Binary content"
+      subtitle={ext ? `${ext} · ${size}` : size}
+      icon={File01Icon}
+      iconClass="text-muted-foreground"
+      iconWrapClass="bg-muted/50 ring-1 ring-border/50"
+    />
+  );
+}
+
+function TextDiff({
+  oldFile,
+  newFile,
+  diffStyle,
+  isDark,
+  options,
+  lineAnnotations,
+  selectedLines,
+  renderAnnotation,
+  renderGutterUtility
+}: TextDiffProps) {
   const key = cacheKey(oldFile, newFile, diffStyle, isDark);
   const [oldWithCache, newWithCache] = useMemo(
     () =>
       [
-        { ...oldFile, cacheKey: key },
-        { ...newFile, cacheKey: key }
+        { ...oldFile, cacheKey: `${key}:old` },
+        { ...newFile, cacheKey: `${key}:new` }
       ] as const,
     [oldFile, newFile, key]
   );
   const themeType = isDark ? ('dark' as const) : ('light' as const);
 
-  const canInteract = !pendingComment && !!onAddComment;
-  const options = {
+  const mergedOptions: DiffOptions = {
     diffStyle,
-    overflow: 'scroll' as const,
+    overflow: 'scroll',
     themeType,
     expandUnchanged: false,
-    enableHoverUtility: canInteract,
+    ...options
+  };
+
+  return (
+    <Virtualizer className="flex-1 overflow-auto">
+      <MultiFileDiff
+        oldFile={oldWithCache}
+        newFile={newWithCache}
+        options={mergedOptions}
+        lineAnnotations={lineAnnotations}
+        selectedLines={selectedLines}
+        renderAnnotation={renderAnnotation}
+        renderGutterUtility={renderGutterUtility}
+      />
+    </Virtualizer>
+  );
+}
+
+function ReviewTextDiff({ review, ...diff }: ReviewTextDiffProps) {
+  const { comments, form, selectedLines } = review;
+  const { addComment } = useReview();
+  const canInteract = form.type !== 'pending';
+
+  const options: Partial<DiffOptions> = {
+    enableGutterUtility: canInteract,
     enableLineSelection: canInteract,
     onLineSelectionEnd: (range: SelectedLineRange | null) => {
-      if (!range || !onAddComment) return;
-      const side: AnnotationSide =
+      if (!range) return;
+      const side: CommentSide =
         (range.endSide ?? range.side) === 'deletions' ? 'deletions' : 'additions';
       const lineNumber = Math.max(range.start, range.end);
       const startLine = Math.min(range.start, range.end);
-      onAddComment(side, lineNumber, startLine === lineNumber ? undefined : startLine);
+      addComment(side, lineNumber, startLine === lineNumber ? undefined : startLine);
     }
   };
 
@@ -176,92 +236,73 @@ function TextDiffViewer({ oldFile, newFile, diffStyle, isDark, review }: TextDif
       metadata: { type: 'comment', comment }
     }));
 
-    if (pendingComment) {
+    if (form.type === 'pending') {
       annotations.push({
-        side: pendingComment.side,
-        lineNumber: pendingComment.lineNumber,
-        metadata: { type: 'form', startLine: pendingComment.startLine }
+        side: form.comment.side,
+        lineNumber: form.comment.lineNumber,
+        metadata: { type: 'form', startLine: form.comment.startLine }
       });
     }
 
     return annotations;
-  }, [comments, pendingComment]);
+  }, [comments, form]);
 
   const renderAnnotation = (annotation: DiffLineAnnotation<AnnotationMetadata>) => {
     if (!annotation.metadata) return null;
 
     if (annotation.metadata.type === 'form') {
-      const startLine = annotation.metadata.startLine;
       return (
         <CommentForm
-          onSubmit={async (body) => {
-            if (!onSubmitComment) return;
-            await onSubmitComment(body, annotation.side, annotation.lineNumber, startLine);
-          }}
-          onCancel={() => onCancelComment?.()}
+          side={annotation.side}
+          lineNumber={annotation.lineNumber}
+          startLine={annotation.metadata.startLine}
+          draft={form.type === 'pending' ? form.draft : ''}
         />
       );
     }
 
     const comment = annotation.metadata.comment;
+    const isEditing = form.type === 'editing' && form.commentId === comment.id;
     return (
       <CommentDisplay
         comment={comment}
-        isEditing={editingCommentId === comment.id}
-        onStartEdit={
-          onStartEditComment
-            ? () => {
-                onStartEditComment(comment.id);
-              }
-            : undefined
-        }
-        onStopEdit={onStopEditComment}
-        onUpdate={onUpdateComment}
-        onDelete={onDeleteComment}
+        isEditing={isEditing}
+        draft={isEditing ? form.draft : undefined}
       />
     );
   };
 
-  const renderHoverUtility = (
-    getHoveredLine: () => { lineNumber: number; side: AnnotationSide } | undefined
-  ) => {
-    if (!onAddComment) return null;
-    return (
-      <AddCommentButton
-        onClick={() => {
-          const hovered = getHoveredLine();
-          if (hovered) onAddComment(hovered.side, hovered.lineNumber);
-        }}
-      />
-    );
-  };
+  const renderGutterUtility = (
+    getHoveredLine: () => { lineNumber: number; side: CommentSide } | undefined
+  ) => (
+    <AddCommentButton
+      onClick={() => {
+        const hovered = getHoveredLine();
+        if (hovered) addComment(hovered.side, hovered.lineNumber);
+      }}
+    />
+  );
 
   return (
-    <div className="flex-1 overflow-auto">
-      <MultiFileDiff
-        oldFile={oldWithCache}
-        newFile={newWithCache}
-        options={options}
-        lineAnnotations={lineAnnotations}
-        selectedLines={selectedLines}
-        renderAnnotation={renderAnnotation}
-        renderHoverUtility={onAddComment ? renderHoverUtility : undefined}
-      />
-    </div>
+    <TextDiff
+      {...diff}
+      options={options}
+      lineAnnotations={lineAnnotations}
+      selectedLines={selectedLines}
+      renderAnnotation={renderAnnotation}
+      renderGutterUtility={renderGutterUtility}
+    />
   );
 }
 
 export function DiffViewer({
-  oldFile,
-  newFile,
-  isLoading,
-  error,
+  state,
   onRetry,
   isDark = false,
   diffStyle = 'split',
-  ...review
+  review
 }: DiffViewerProps) {
-  if (isLoading) {
+  if (state.status === 'loading') {
     return (
       <CardState
         title="Loading diff..."
@@ -272,29 +313,11 @@ export function DiffViewer({
     );
   }
 
-  if (error !== null) {
-    return (
-      <CardState
-        title="Error loading diff"
-        subtitle={error}
-        icon={Alert02Icon}
-        iconClass="text-destructive"
-        iconWrapClass="bg-destructive/10 ring-1 ring-destructive/20"
-        action={
-          onRetry ? (
-            <button
-              onClick={onRetry}
-              className="mt-4 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Try again
-            </button>
-          ) : undefined
-        }
-      />
-    );
+  if (state.status === 'error') {
+    return <ErrorState message={getErrorMessage(state.error)} onRetry={onRetry} />;
   }
 
-  if (!oldFile || !newFile) {
+  if (state.status === 'idle') {
     return (
       <CardState
         title="Select a file to view diff"
@@ -306,34 +329,18 @@ export function DiffViewer({
     );
   }
 
-  if (oldFile.content?.type === 'binary' || newFile.content?.type === 'binary') {
-    const oldSize = oldFile.content?.type === 'binary' ? oldFile.content.size : null;
-    const newSize = newFile.content?.type === 'binary' ? newFile.content.size : null;
-    const size =
-      oldSize !== null && newSize !== null && oldSize !== newSize
-        ? `${formatBytes(Number(oldSize))} -> ${formatBytes(Number(newSize))}`
-        : formatBytes(Number(newSize ?? oldSize ?? 0));
-    const ext = extension(newFile.name || oldFile.name);
+  const { oldFile, newFile } = state.data;
 
-    return (
-      <CardState
-        role="status"
-        title="Binary content"
-        subtitle={ext ? `${ext} · ${size}` : size}
-        icon={File01Icon}
-        iconClass="text-muted-foreground"
-        iconWrapClass="bg-muted/50 ring-1 ring-border/50"
-      />
-    );
+  if (oldFile.content?.type === 'binary' || newFile.content?.type === 'binary') {
+    return <BinaryState oldFile={oldFile} newFile={newFile} />;
   }
 
-  return (
-    <TextDiffViewer
-      oldFile={toFileContents(oldFile)}
-      newFile={toFileContents(newFile)}
-      diffStyle={diffStyle}
-      isDark={isDark}
-      review={review}
-    />
-  );
+  const diff = {
+    oldFile: toFileContents(oldFile),
+    newFile: toFileContents(newFile),
+    diffStyle,
+    isDark
+  };
+
+  return review ? <ReviewTextDiff {...diff} review={review} /> : <TextDiff {...diff} />;
 }

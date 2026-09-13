@@ -7,7 +7,7 @@ import {
   type GitFileContents
 } from '../../../tauri-bindings';
 
-type GitFileContentsState =
+export type GitFileContentsState =
   | { status: 'idle' }
   | { status: 'loading' }
   | { status: 'success'; data: GitFileContents }

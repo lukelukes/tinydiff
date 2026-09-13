@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import type { Comment, CommentCollection, CommandError } from '../../../tauri-bindings';
-
 import { commands } from '../../../tauri-bindings';
 
+export type CommentSide = 'deletions' | 'additions';
+
 export interface PendingComment {
-  side: 'deletions' | 'additions';
+  side: CommentSide;
   lineNumber: number;
   startLine?: number;
 }
 
-type CommentFormState =
+export type CommentFormState =
   | { type: 'closed' }
-  | { type: 'pending'; comment: PendingComment }
-  | { type: 'editing'; commentId: string };
+  | { type: 'pending'; comment: PendingComment; draft: string }
+  | { type: 'editing'; commentId: string; draft: string };
 
 type CommentsState =
   | { status: 'loading' }
@@ -23,9 +24,11 @@ type CommentsState =
 export function useComments(repoPath: string) {
   const [state, setState] = useState<CommentsState>({ status: 'loading' });
   const [formState, setFormState] = useState<CommentFormState>({ type: 'closed' });
+  const draft = formState.type === 'closed' ? null : formState.draft;
 
-  const pendingComment = formState.type === 'pending' ? formState.comment : null;
-  const editingCommentId = formState.type === 'editing' ? formState.commentId : null;
+  const setDraft = useCallback((next: string) => {
+    setFormState((prev) => (prev.type === 'closed' ? prev : { ...prev, draft: next }));
+  }, []);
 
   const refresh = useCallback(async () => {
     setState({ status: 'loading' });
@@ -38,7 +41,7 @@ export function useComments(repoPath: string) {
   }, [repoPath]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- data fetching pattern, setState is in async callback
+    // eslint-disable-next-line react/set-state-in-effect -- data fetching pattern, setState is in async callback
     void refresh();
   }, [refresh]);
 
@@ -60,30 +63,27 @@ export function useComments(repoPath: string) {
 
   const updateComment = useCallback(
     async (comment: Comment, fileContents: string | null) => {
-      let previousState: CommentsState | null = null;
+      const previousState = state;
 
-      setState((prev) => {
-        previousState = prev;
-        return prev.status === 'success'
+      setState((prev) =>
+        prev.status === 'success'
           ? {
               ...prev,
               data: {
                 comments: prev.data.comments.map((c) => (c.id === comment.id ? comment : c))
               }
             }
-          : prev;
-      });
+          : prev
+      );
 
       const result = await commands.saveComment(repoPath, comment, fileContents);
       if (result.status !== 'ok') {
-        if (previousState) {
-          setState(previousState);
-        }
+        setState(previousState);
         return { success: false as const, error: result.error };
       }
       return { success: true as const };
     },
-    [repoPath]
+    [repoPath, state]
   );
 
   const deleteComment = useCallback(
@@ -99,14 +99,14 @@ export function useComments(repoPath: string) {
   );
 
   const openCommentForm = useCallback(
-    (side: 'deletions' | 'additions', lineNumber: number, startLine?: number) => {
-      setFormState({ type: 'pending', comment: { side, lineNumber, startLine } });
+    (side: CommentSide, lineNumber: number, startLine?: number) => {
+      setFormState({ type: 'pending', comment: { side, lineNumber, startLine }, draft: '' });
     },
     []
   );
 
-  const startEditing = useCallback((id: string) => {
-    setFormState({ type: 'editing', commentId: id });
+  const startEditing = useCallback((id: string, body: string) => {
+    setFormState({ type: 'editing', commentId: id, draft: body });
   }, []);
 
   const stopEditing = useCallback(() => {
@@ -115,8 +115,9 @@ export function useComments(repoPath: string) {
 
   return {
     state,
-    pendingComment,
-    editingCommentId,
+    formState,
+    draft,
+    setDraft,
     refresh,
     saveComment,
     updateComment,
