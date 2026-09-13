@@ -409,7 +409,7 @@ export function CommentDisplay({
     'tsx'
   ),
 
-  'src-tauri/src/comments.rs': makeGitFileContents(
+  'crates/tinydiff-core/src/comments.rs': makeGitFileContents(
     'comments.rs',
     commentsOld,
     'comments.rs',
