@@ -10,7 +10,7 @@
     "#core/*": "./src/core/*",
     "#lib/*": "./src/lib/*",
     "#testing/*": "./src/testing/*",
-    "#tauri-bindings/*": "./tauri-bindings/*.ts"
+    "#bindings/*": "./src/bindings/*.ts"
   },
   "scripts": {
     "build": "tsc && vite build",
@@ -28,9 +28,10 @@
     "lint:renderer": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.json src public",
     "postinstall": "install-electron",
     "tauri": "tauri",
-    "test": "vitest --run",
+    "test": "vitest --run --project unit --project property --project browser",
     "test:browser": "bun vitest run --project browser",
     "test:browser:headed": "HEADED=true bun vitest run --project browser",
+    "test:e2e": "bun vitest run --project e2e",
     "test:property": "bun vitest run --project property",
     "test:unit": "bun vitest run --project unit",
     "test:watch": "bun vitest",

@@ -8,9 +8,9 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 
+import type { Comment } from '#bindings/index';
 import { cn } from '#features/lib/utils';
 
-import type { Comment } from '../../../tauri-bindings';
 import { Button } from '../components/ui/button';
 import { useReview } from './review-context';
 import { formatRelativeTime, type CommentSide } from './use-comments';

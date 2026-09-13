@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import type { Comment, CommentCollection, CommandError } from '../../../tauri-bindings';
-import { commands } from '../../../tauri-bindings';
+import type { Comment, CommentCollection, CommandError } from '#bindings/index';
+import { commands } from '#bindings/index';
 
 export type CommentSide = 'deletions' | 'additions';
 

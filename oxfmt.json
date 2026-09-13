@@ -18,7 +18,6 @@
   "ignorePatterns": [
     "dist",
     "node_modules",
-    "tauri-bindings",
     "src/bindings/types.ts",
     "crates/tinydiff-napi/index.d.ts",
     "**/*.toml",

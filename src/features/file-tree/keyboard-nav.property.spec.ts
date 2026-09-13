@@ -2,7 +2,8 @@
 import * as fc from 'fast-check';
 import { describe, it } from 'vitest';
 
-import type { GitStatus } from '../../../tauri-bindings';
+import type { GitStatus } from '#bindings/index';
+
 import { applyKeyboardNav, type NavigationKey, type NavigationState } from './keyboard-nav';
 import { buildFileTree, type FileTreeNode } from './tree-builder';
 import { getAllPaths } from './tree-utils';

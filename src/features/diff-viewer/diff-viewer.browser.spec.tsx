@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 
-import type { DiffFile } from '../../../tauri-bindings';
+import type { DiffFile } from '#bindings/index';
+
 import { DiffViewer } from './diff-viewer';
 import type { GitFileContentsState } from './use-git-file-contents';
 

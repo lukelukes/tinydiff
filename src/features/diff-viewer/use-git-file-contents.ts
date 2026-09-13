@@ -5,7 +5,7 @@ import {
   type CommandError,
   type DiffTarget,
   type GitFileContents
-} from '../../../tauri-bindings';
+} from '#bindings/index';
 
 export type GitFileContentsState =
   | { status: 'idle' }

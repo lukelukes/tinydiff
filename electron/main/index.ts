@@ -2,14 +2,17 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, session, shell } from 'electron';
 
+import type { AppMode } from '../../src/bindings/types';
+import { describeError, resolveAppMode } from './app-mode';
 import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
+import { devOrigin, rendererUrl } from './env';
 import { externalUrl } from './external-url';
+import { applyTheme, registerHandlers } from './handlers';
 import { applyDevCsp, serveRenderer } from './protocol';
-import { devRendererUrl } from './renderer-url';
+import { flushSettings, getSetting } from './settings';
 
 let mainWindow: BrowserWindow | null = null;
 let rendererReloaded = false;
-let devOrigin: string | null = null;
 
 function log(message: string): void {
   process.stderr.write(`[tinydiff] ${message}\n`);
@@ -78,9 +81,7 @@ function focusMainWindow(): void {
   mainWindow.focus();
 }
 
-async function start(): Promise<void> {
-  const rendererUrl = devRendererUrl(process.env.ELECTRON_RENDERER_URL, app.isPackaged);
-  devOrigin = rendererUrl ? new URL(rendererUrl).origin : null;
+async function start(appMode: AppMode): Promise<void> {
   await app.whenReady();
 
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
@@ -94,12 +95,14 @@ async function start(): Promise<void> {
     serveRenderer(join(import.meta.dirname, '../renderer'));
   }
 
+  applyTheme(getSetting('theme'));
+  registerHandlers(appMode);
   const win = createWindow();
   mainWindow = win;
   await win.loadURL(rendererUrl ?? `${RENDERER_ORIGIN}/`);
 }
 
-function bootstrap(): void {
+function bootstrap(appMode: AppMode): void {
   app.on('second-instance', (_event, argv, workingDirectory) => {
     log(`second instance launched in ${workingDirectory} with ${JSON.stringify(argv)}`);
     focusMainWindow();
@@ -128,7 +131,11 @@ function bootstrap(): void {
     app.quit();
   });
 
-  start().catch((error: unknown) => {
+  app.on('will-quit', () => {
+    flushSettings();
+  });
+
+  start(appMode).catch((error: unknown) => {
     log(`startup failed: ${formatError(error)}`);
     app.exit(1);
   });
@@ -136,8 +143,13 @@ function bootstrap(): void {
 
 app.setName('tinydiff');
 
-if (app.requestSingleInstanceLock()) {
-  bootstrap();
+const appMode = resolveAppMode(process.argv);
+
+if (appMode.status === 'error') {
+  log(describeError(appMode.error));
+  app.exit(1);
+} else if (app.requestSingleInstanceLock()) {
+  bootstrap(appMode.data);
 } else {
   app.exit(0);
 }

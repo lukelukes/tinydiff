@@ -1,6 +1,26 @@
-import { LazyStore } from '@tauri-apps/plugin-store';
+export type Theme = 'dark' | 'light';
 
-export const settingsStore = new LazyStore('settings.json', {
-  autoSave: 100,
-  defaults: { theme: 'dark', viewMode: 'split' }
-});
+export type ViewMode = 'split' | 'unified';
+
+interface Settings {
+  theme: Theme;
+  viewMode: ViewMode;
+}
+
+type SettingKey = keyof Settings;
+
+const guards: { [K in SettingKey]: (value: unknown) => value is Settings[K] } = {
+  theme: (value): value is Theme => value === 'dark' || value === 'light',
+  viewMode: (value): value is ViewMode => value === 'split' || value === 'unified'
+};
+
+export const settingsStore = {
+  async get<K extends SettingKey>(key: K): Promise<Settings[K] | null> {
+    const value = await window.tinydiff.settingsGet(key);
+    const isValid: (value: unknown) => value is Settings[K] = guards[key];
+    return isValid(value) ? value : null;
+  },
+  set<K extends SettingKey>(key: K, value: Settings[K]): Promise<void> {
+    return window.tinydiff.settingsSet(key, value);
+  }
+};

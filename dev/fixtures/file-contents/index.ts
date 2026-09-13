@@ -1,4 +1,4 @@
-import type { GitFileContents, DiffFile, FileContent } from '#tauri-bindings/index';
+import type { GitFileContents, DiffFile, FileContent } from '#bindings/index';
 
 import commentsNew from './comments-new.rs?raw';
 import commentsOld from './comments-old.rs?raw';
@@ -49,7 +49,7 @@ import { Cancel01Icon, Loading02Icon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Comment } from '../../../tauri-bindings';
+import type { Comment } from '#bindings/index';
 
 import { Button } from '../components/ui/button';
 import { formatRelativeTime } from './use-comments';
@@ -165,7 +165,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { Comment } from '../../../tauri-bindings';
+import type { Comment } from '#bindings/index';
 
 import { Button } from '../components/ui/button';
 import { formatRelativeTime } from './use-comments';
