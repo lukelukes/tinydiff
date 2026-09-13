@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url';
 
 import { net, protocol, session } from 'electron';
 
-import { CSP, DEV_CSP } from './csp';
+import { CSP, devCsp } from './csp';
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }
@@ -32,10 +32,11 @@ export function serveRenderer(root: string): void {
   });
 }
 
-export function applyDevCsp(): void {
+export function applyDevCsp(nonce: string | undefined): void {
+  const policy = devCsp(nonce);
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
-      responseHeaders: { ...details.responseHeaders, 'content-security-policy': [DEV_CSP] }
+      responseHeaders: { ...details.responseHeaders, 'content-security-policy': [policy] }
     });
   });
 }

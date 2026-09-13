@@ -1,6 +1,6 @@
 export const RENDERER_ORIGIN = 'app://renderer';
 
-export const DEV_CSP_NONCE = 'tinydiff-dev';
+export const DEV_CSP_NONCE_ENV = 'TINYDIFF_DEV_CSP_NONCE';
 
 const directives = {
   'default-src': ["'self'"],
@@ -20,7 +20,12 @@ function serialize(policy: Record<string, string[]>): string {
 
 export const CSP = serialize(directives);
 
-export const DEV_CSP = serialize({
-  ...directives,
-  'script-src': [...directives['script-src'], `'nonce-${DEV_CSP_NONCE}'`]
-});
+export function devCsp(nonce: string | undefined): string {
+  if (!nonce) {
+    return CSP;
+  }
+  return serialize({
+    ...directives,
+    'script-src': [...directives['script-src'], `'nonce-${nonce}'`]
+  });
+}
