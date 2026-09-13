@@ -1,5 +1,4 @@
 import type { FileTreeNode } from './tree-builder';
-
 import { flattenTree } from './tree-utils';
 
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End';

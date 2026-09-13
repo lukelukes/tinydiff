@@ -179,7 +179,7 @@ async function handlePluginOpener(cmd: string, args: InvokeArgs): Promise<unknow
   switch (cmd) {
     case 'plugin:opener|open_url':
       console.log('[Mock] Opening URL:', args.url);
-      window.open(args.url as string, '_blank');
+      window.open(args.url as string, '_blank', 'noopener,noreferrer');
       return null;
     case 'plugin:opener|open_path':
       console.log('[Mock] Opening path:', args.path);

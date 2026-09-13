@@ -1,7 +1,6 @@
-import type { FileContents, SupportedLanguages } from '@pierre/diffs/react';
-
 import { Alert02Icon, File01Icon, ReloadIcon } from '@hugeicons/core-free-icons';
 import { HugeiconsIcon } from '@hugeicons/react';
+import type { FileContents, SupportedLanguages } from '@pierre/diffs/react';
 import { MultiFileDiff } from '@pierre/diffs/react';
 
 import type { FileContents as TauriFileContents } from '../../../tauri-bindings';

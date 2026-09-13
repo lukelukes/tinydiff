@@ -21,7 +21,7 @@ export function useGitStatus(repoPath: string) {
   }, [repoPath]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks-js/set-state-in-effect -- data fetching pattern, setState is in async callback
+    // eslint-disable-next-line react/set-state-in-effect -- data fetching pattern, setState is in async callback
     void refresh();
   }, [refresh]);
 

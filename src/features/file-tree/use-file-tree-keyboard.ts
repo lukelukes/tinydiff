@@ -1,9 +1,8 @@
 import { useState } from 'react';
 
 import type { DiffTarget } from '../../../tauri-bindings';
-import type { FileTreeNode } from './tree-builder';
-
 import { applyKeyboardNav, type NavigationKey } from './keyboard-nav';
+import type { FileTreeNode } from './tree-builder';
 import { flattenTree, getAllDirectoryPaths } from './tree-utils';
 
 interface UseFileTreeKeyboardOptions {

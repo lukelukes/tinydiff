@@ -18,11 +18,11 @@ describe('ErrorDisplay', () => {
 
   it('shows retry button when onRetry is provided', async () => {
     const error = new Error('Failed');
-    const onRetry = vi.fn();
+    const onRetry = vi.fn<() => void>();
 
     const screen = await render(<ErrorDisplay title="Error" error={error} onRetry={onRetry} />);
 
-    const retryButton = screen.getByRole('button', { name: /retry/i });
+    const retryButton = screen.getByRole('button', { name: /retry/iu });
     await expect.element(retryButton).toBeVisible();
 
     await retryButton.click();
@@ -35,7 +35,7 @@ describe('ErrorDisplay', () => {
 
     const screen = await render(<ErrorDisplay title="Error" error={error} />);
 
-    const retryButton = screen.getByRole('button', { name: /retry/i });
+    const retryButton = screen.getByRole('button', { name: /retry/iu });
     await expect.element(retryButton).not.toBeInTheDocument();
   });
 });

@@ -1,9 +1,8 @@
 /* eslint-disable eslint-plugin-jest/no-conditional-in-test */
-import fc from 'fast-check';
+import * as fc from 'fast-check';
 import { describe, it } from 'vitest';
 
 import type { GitStatus } from '../../../tauri-bindings';
-
 import { applyKeyboardNav, type NavigationKey, type NavigationState } from './keyboard-nav';
 import { buildFileTree, type FileTreeNode } from './tree-builder';
 import { getAllPaths } from './tree-utils';
