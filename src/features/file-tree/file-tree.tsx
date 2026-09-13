@@ -1,16 +1,4 @@
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger
-} from '#features/components/ui/collapsible';
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  sidebarMenuButtonVariants,
-  SidebarMenuItem,
-  SidebarMenuSub
-} from '#features/components/ui/sidebar';
-import {
   ArrowRight01Icon,
   File01Icon,
   Folder01Icon,
@@ -19,8 +7,20 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useRef } from 'react';
 
-import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '#features/components/ui/collapsible';
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub
+} from '#features/components/ui/sidebar';
+import { sidebarMenuButtonVariants } from '#features/components/ui/sidebar-menu-button-variants';
 
+import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 import { buildFileTree, getStatusLabel, type FileTreeNode } from './tree-builder';
 import { useFileTreeKeyboard } from './use-file-tree-keyboard';
 
@@ -56,6 +56,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   return (
     <SidebarMenu
       ref={containerRef}
+      aria-label="Changed files"
       tabIndex={0}
       onKeyDown={(e) => {
         handleKeyDown(e);
@@ -124,7 +125,7 @@ function TreeItem({
           <HugeiconsIcon
             icon={File01Icon}
             size={14}
-            className="shrink-0 text-muted-foreground group-hover/file:text-muted-foreground transition-colors"
+            className="shrink-0 text-muted-foreground transition-colors group-hover/file:text-muted-foreground"
           />
           <span className="flex-1 truncate text-sm">{node.name}</span>
           <span

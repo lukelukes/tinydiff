@@ -1,10 +1,10 @@
-import { SidebarProvider } from '#features/components/ui/sidebar';
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
-import type { DiffTarget, GitStatus } from '../../../tauri-bindings';
+import { SidebarProvider } from '#features/components/ui/sidebar';
 
+import type { DiffTarget, GitStatus } from '../../../tauri-bindings';
 import { FileTree } from './file-tree';
 
 function createStatus(files: { path: string; staged?: boolean }[]): GitStatus {
@@ -34,11 +34,11 @@ function renderFileTree(props: {
 describe('FileTree keyboard navigation', () => {
   it('Enter selects the focused file', async () => {
     const status = createStatus([{ path: 'src/app.tsx' }]);
-    const onSelectFile = vi.fn();
+    const onSelectFile = vi.fn<(path: string, target: DiffTarget) => void>();
 
     const screen = await renderFileTree({ status, selectedFile: null, onSelectFile });
 
-    const container = screen.getByRole('list');
+    const container = screen.getByRole('list', { name: 'Changed files' });
     await container.click();
 
     const fileButton = screen.getByText('app.tsx');
@@ -53,11 +53,11 @@ describe('FileTree keyboard navigation', () => {
 
   it('Space selects the focused file', async () => {
     const status = createStatus([{ path: 'src/app.tsx' }]);
-    const onSelectFile = vi.fn();
+    const onSelectFile = vi.fn<(path: string, target: DiffTarget) => void>();
 
     const screen = await renderFileTree({ status, selectedFile: null, onSelectFile });
 
-    const container = screen.getByRole('list');
+    const container = screen.getByRole('list', { name: 'Changed files' });
     await container.click();
 
     const fileButton = screen.getByText('app.tsx');
@@ -72,7 +72,7 @@ describe('FileTree keyboard navigation', () => {
 
   it('shows "No changes detected" when tree is empty', async () => {
     const status: GitStatus = { staged: [], unstaged: [], untracked: [] };
-    const onSelectFile = vi.fn();
+    const onSelectFile = vi.fn<(path: string, target: DiffTarget) => void>();
 
     const screen = await renderFileTree({ status, selectedFile: null, onSelectFile });
 
@@ -82,7 +82,7 @@ describe('FileTree keyboard navigation', () => {
 
   it('clicking a file selects it', async () => {
     const status = createStatus([{ path: 'src/app.tsx' }, { path: 'src/lib/utils.ts' }]);
-    const onSelectFile = vi.fn();
+    const onSelectFile = vi.fn<(path: string, target: DiffTarget) => void>();
 
     const screen = await renderFileTree({ status, selectedFile: null, onSelectFile });
 
@@ -94,7 +94,7 @@ describe('FileTree keyboard navigation', () => {
 
   it('displays file status badges', async () => {
     const status = createStatus([{ path: 'src/app.tsx' }]);
-    const onSelectFile = vi.fn();
+    const onSelectFile = vi.fn<(path: string, target: DiffTarget) => void>();
 
     const screen = await renderFileTree({ status, selectedFile: null, onSelectFile });
 
@@ -104,7 +104,7 @@ describe('FileTree keyboard navigation', () => {
 
   it('renders folder structure correctly', async () => {
     const status = createStatus([{ path: 'src/app.tsx' }, { path: 'src/lib/utils.ts' }]);
-    const onSelectFile = vi.fn();
+    const onSelectFile = vi.fn<(path: string, target: DiffTarget) => void>();
 
     const screen = await renderFileTree({ status, selectedFile: null, onSelectFile });
 
