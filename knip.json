@@ -9,6 +9,6 @@
   ],
   "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "*.ts"],
   "ignore": ["src/testing/fake-tauri.ts"],
-  "ignoreDependencies": ["@tauri-apps/*"],
+  "ignoreDependencies": ["@tauri-apps/*", "@napi-rs/cli"],
   "ignoreExportsUsedInFile": true
 }
