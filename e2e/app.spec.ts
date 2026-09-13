@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import type { Rectangle } from 'electron';
 import type { ElectronApplication, Page } from 'playwright';
 import { _electron as electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -54,27 +55,40 @@ function createRepo(): string {
   return dir;
 }
 
+function launch(repoDir: string, configDir: string): Promise<ElectronApplication> {
+  const executablePath = process.env.TD_E2E_BINARY;
+  return electron.launch({
+    ...(executablePath ? { executablePath } : {}),
+    args: executablePath ? [repoDir] : [resolve('out/main/index.js'), repoDir],
+    chromiumSandbox: true,
+    env: { ...definedEnv(), XDG_CONFIG_HOME: configDir }
+  });
+}
+
+function windowBounds(target: ElectronApplication): Promise<Rectangle | null> {
+  return target.evaluate(
+    ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.getNormalBounds() ?? null
+  );
+}
+
 describe('tinydiff electron app', () => {
   let repoDir: string;
   let configDir: string;
   let app: ElectronApplication;
   let page: Page;
+  let closed = false;
 
   beforeAll(async () => {
     repoDir = createRepo();
     configDir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-config-'));
-    const executablePath = process.env.TD_E2E_BINARY;
-    app = await electron.launch({
-      ...(executablePath ? { executablePath } : {}),
-      args: executablePath ? [repoDir] : [resolve('out/main/index.js'), repoDir],
-      chromiumSandbox: true,
-      env: { ...definedEnv(), XDG_CONFIG_HOME: configDir }
-    });
+    app = await launch(repoDir, configDir);
     page = await app.firstWindow();
   });
 
   afterAll(async () => {
-    await app.close();
+    if (!closed) {
+      await app.close();
+    }
     rmSync(repoDir, { recursive: true, force: true });
     rmSync(configDir, { recursive: true, force: true });
   });
@@ -91,6 +105,15 @@ describe('tinydiff electron app', () => {
   it('runs with the chromium sandbox enabled', async () => {
     await expect(
       app.evaluate(({ app: electronApp }) => electronApp.commandLine.hasSwitch('no-sandbox'))
+    ).resolves.toBe(false);
+  });
+
+  it('refuses to open non-http urls externally', async () => {
+    await expect(
+      page.evaluate(() => window.tinydiff.openExternal('file:///etc/passwd'))
+    ).resolves.toBe(false);
+    await expect(
+      page.evaluate(() => window.tinydiff.openExternal('javascript:alert(1)'))
     ).resolves.toBe(false);
   });
 
@@ -157,5 +180,40 @@ describe('tinydiff electron app', () => {
       theme: 'dark',
       viewMode: 'unified'
     });
+  });
+
+  it('restores the window bounds after a restart', async () => {
+    await app.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setSize(900, 700);
+    });
+    await expect
+      .poll(() => windowBounds(app), { timeout: 5000 })
+      .toMatchObject({
+        width: 900,
+        height: 700
+      });
+    const bounds = await windowBounds(app);
+
+    await app.close();
+    closed = true;
+
+    const stateFile = join(configDir, 'tinydiff', 'window-state.json');
+    expect(JSON.parse(readFileSync(stateFile, 'utf8'))).toStrictEqual({
+      bounds,
+      maximized: false
+    });
+
+    const restarted = await launch(repoDir, configDir);
+    try {
+      await restarted.firstWindow();
+      await expect
+        .poll(() => windowBounds(restarted), { timeout: 5000 })
+        .toMatchObject({
+          width: 900,
+          height: 700
+        });
+    } finally {
+      await restarted.close();
+    }
   });
 });
