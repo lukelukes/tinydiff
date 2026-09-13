@@ -23,6 +23,7 @@
     "knip": "knip",
     "lint": "oxlint --type-aware --type-check --config oxlint.json -f stylish src",
     "lint:fix": "oxlint --type-aware --type-check --config oxlint.json -f stylish --fix src",
+    "postinstall": "install-electron",
     "tauri": "tauri",
     "test": "vitest --run",
     "test:browser": "bun vitest run --project browser",
@@ -80,8 +81,5 @@
     "vite": "8.0.3",
     "vitest": "4.1.2",
     "vitest-browser-react": "2.1.0"
-  },
-  "trustedDependencies": [
-    "electron"
-  ]
+  }
 }
