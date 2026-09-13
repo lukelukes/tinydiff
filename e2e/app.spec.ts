@@ -9,6 +9,9 @@ import type { ElectronApplication, Page } from 'playwright';
 import { _electron as electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import type { PackagedBinary } from './packaged-binary';
+import { inspectablePackagedBinary } from './packaged-binary';
+
 declare global {
   var openedExternally: string[] | undefined;
 }
@@ -64,8 +67,19 @@ function createRepo(): string {
   return dir;
 }
 
+let packaged: PackagedBinary | undefined;
+
+beforeAll(async () => {
+  const binary = process.env.TD_E2E_BINARY;
+  packaged = binary === undefined ? undefined : await inspectablePackagedBinary(binary);
+});
+
+afterAll(() => {
+  packaged?.dispose();
+});
+
 function launch(repoDir: string, userDataDir: string): Promise<ElectronApplication> {
-  const executablePath = process.env.TD_E2E_BINARY;
+  const executablePath = packaged?.executablePath;
   const appArgs = [`--user-data-dir=${userDataDir}`, repoDir];
   return electron.launch({
     ...(executablePath ? { executablePath } : {}),

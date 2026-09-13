@@ -4,9 +4,10 @@
     "index.html",
     "electron.vite.config.ts",
     "electron/main/index.ts",
-    "electron/preload/index.ts"
+    "electron/preload/index.ts",
+    "e2e/**/*.spec.ts"
   ],
-  "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "*.ts"],
+  "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "e2e/**/*.ts", "*.ts"],
   "ignore": ["electron/main/assets.d.ts", "src/bindings/types.ts"],
   "ignoreBinaries": ["just"],
   "ignoreDependencies": ["@napi-rs/cli"],
