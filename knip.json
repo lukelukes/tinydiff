@@ -1,7 +1,7 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/index.tsx", "vite.config.ts", "vitest.config.ts"],
-  "project": ["src/**/*.{ts,tsx}"],
+  "entry": ["electron/main/index.ts", "electron/preload/index.ts", "electron.vite.config.ts"],
+  "project": ["src/**/*.{ts,tsx}", "electron/**/*.ts", "*.ts"],
   "ignore": [],
   "ignoreDependencies": ["@tauri-apps/*"],
   "ignoreExportsUsedInFile": true
