@@ -11,6 +11,7 @@ import { applyTheme, registerHandlers } from './handlers';
 import { log } from './log';
 import { applyDevCsp, serveRenderer } from './protocol';
 import { flushSettings, getSetting } from './settings';
+import { DEFAULT_WINDOW_SIZE, loadWindowState, trackWindowState } from './window-state';
 
 let mainWindow: BrowserWindow | null = null;
 let rendererReloaded = false;
@@ -27,9 +28,10 @@ function isAllowedNavigation(url: string): boolean {
 }
 
 function createWindow(): BrowserWindow {
+  const state = loadWindowState();
   const win = new BrowserWindow({
-    width: 1024,
-    height: 768,
+    ...DEFAULT_WINDOW_SIZE,
+    ...state?.bounds,
     show: false,
     title: 'TinyDiff',
     backgroundColor: '#18181b',
@@ -42,8 +44,13 @@ function createWindow(): BrowserWindow {
   });
 
   win.once('ready-to-show', () => {
+    if (state?.maximized) {
+      win.maximize();
+    }
     win.show();
   });
+
+  trackWindowState(win);
 
   win.webContents.on('will-navigate', (event) => {
     if (!isAllowedNavigation(event.url)) {
