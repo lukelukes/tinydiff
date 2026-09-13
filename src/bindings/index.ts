@@ -55,5 +55,8 @@ export const commands = {
   },
   getCommentsForFile(repoPath: string, filePath: string, fileContents: string) {
     return bridge().getCommentsForFile(repoPath, filePath, fileContents);
+  },
+  openExternal(url: string) {
+    return bridge().openExternal(url);
   }
 };
