@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -11,23 +10,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import type { PackagedBinary } from './packaged-binary';
 import { inspectablePackagedBinary } from './packaged-binary';
+import { createRepo, FILE_NAME } from './repo';
 
 declare global {
   var openedExternally: string[] | undefined;
 }
-
-const FILE_NAME = 'greeter.ts';
-
-const ORIGINAL = `export function greet(name: string): string {
-  return \`hello \${name}\`;
-}
-`;
-
-const MODIFIED = `export function greet(name: string, excited = false): string {
-  const punctuation = excited ? '!' : '.';
-  return \`hello \${name}\${punctuation}\`;
-}
-`;
 
 const COMMENT_BODY = 'Consider defaulting excited to true';
 
@@ -48,23 +35,6 @@ function definedEnv(): Record<string, string> {
     (entry): entry is [string, string] => typeof entry[1] === 'string'
   );
   return Object.fromEntries(entries);
-}
-
-function git(cwd: string, args: string[]): void {
-  execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], {
-    cwd,
-    stdio: 'ignore'
-  });
-}
-
-function createRepo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-repo-'));
-  git(dir, ['init', '-q']);
-  writeFileSync(join(dir, FILE_NAME), ORIGINAL);
-  git(dir, ['add', FILE_NAME]);
-  git(dir, ['commit', '-q', '-m', 'initial']);
-  writeFileSync(join(dir, FILE_NAME), MODIFIED);
-  return dir;
 }
 
 let packaged: PackagedBinary | undefined;
