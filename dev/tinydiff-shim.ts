@@ -80,10 +80,14 @@ function isExternalUrl(url: string): boolean {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function readSettings(): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+    return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
