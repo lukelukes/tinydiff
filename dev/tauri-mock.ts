@@ -304,6 +304,10 @@ declare global {
 }
 
 export function initTauriMock(): void {
+  if ('tinydiff' in window) {
+    return;
+  }
+
   if (window.__TAURI_INTERNALS__) {
     console.log('[Tauri Mock] Already initialized, skipping');
     return;
