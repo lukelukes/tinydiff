@@ -117,7 +117,7 @@ function hasExited(child: ChildProcess): boolean {
 }
 
 function launch(executable: string, repoDir: string, configDir: string): Launched {
-  const child = spawn(executable, [repoDir], {
+  const child = spawn(executable, ['--ozone-platform=x11', repoDir], {
     env: { ...process.env, XDG_CONFIG_HOME: configDir },
     stdio: ['ignore', 'ignore', 'pipe']
   });
