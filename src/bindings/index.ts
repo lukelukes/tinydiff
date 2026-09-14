@@ -1,7 +1,7 @@
 import type { TinydiffApi } from './api';
 import type { Comment, DiffTarget } from './types';
 
-export type { TinydiffApi } from './api';
+export type { SettingsError, TinydiffApi } from './api';
 export type {
   AppMode,
   Comment,

@@ -1,3 +1,5 @@
+import type { Result, SettingsError } from '#bindings/index';
+
 export type Theme = 'dark' | 'light';
 
 export type ViewMode = 'split' | 'unified';
@@ -20,7 +22,7 @@ export const settingsStore = {
     const isValid: (value: unknown) => value is Settings[K] = guards[key];
     return isValid(value) ? value : null;
   },
-  set<K extends SettingKey>(key: K, value: Settings[K]): Promise<void> {
+  set<K extends SettingKey>(key: K, value: Settings[K]): Promise<Result<null, SettingsError>> {
     return window.tinydiff.settingsSet(key, value);
   }
 };

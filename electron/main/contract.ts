@@ -13,3 +13,9 @@ export const channels = {
   settingsGet: 'tinydiff:settingsGet',
   settingsSet: 'tinydiff:settingsSet'
 } as const satisfies Record<keyof TinydiffApi, string>;
+
+export function isMethod(name: string): name is keyof TinydiffApi {
+  return Object.hasOwn(channels, name);
+}
+
+export const methods = Object.keys(channels).filter((name) => isMethod(name));

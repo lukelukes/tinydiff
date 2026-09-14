@@ -78,7 +78,7 @@ export function createFakeTinydiff(): FakeTinydiff {
     },
     settingsSet(key, value) {
       fake.settings.set(key, value);
-      return Promise.resolve();
+      return Promise.resolve({ status: 'ok', data: null });
     }
   };
   return fake;

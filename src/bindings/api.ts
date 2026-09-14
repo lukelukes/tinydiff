@@ -11,6 +11,8 @@ import type {
   Result
 } from './types';
 
+export type SettingsError = { type: 'settings'; message: string };
+
 export interface TinydiffApi {
   getAppMode: () => Promise<AppMode>;
   getGitStatus: (path: string) => Promise<Result<GitStatus, CommandError>>;
@@ -38,7 +40,7 @@ export interface TinydiffApi {
     fileContents: string
   ) => Promise<Result<Comment[], CommandError>>;
   settingsGet: (key: string) => Promise<unknown>;
-  settingsSet: (key: string, value: unknown) => Promise<void>;
+  settingsSet: (key: string, value: unknown) => Promise<Result<null, SettingsError>>;
 }
 
 declare global {

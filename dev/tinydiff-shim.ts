@@ -146,7 +146,7 @@ export function createShim(): TinydiffApi {
     },
     settingsSet(key, value) {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...readSettings(), [key]: value }));
-      return Promise.resolve();
+      return Promise.resolve({ status: 'ok', data: null });
     }
   };
 }

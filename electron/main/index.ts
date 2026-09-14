@@ -8,15 +8,12 @@ import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
 import { devOrigin, rendererUrl } from './env';
 import { externalUrl } from './external-url';
 import { applyTheme, registerHandlers } from './handlers';
+import { log } from './log';
 import { applyDevCsp, serveRenderer } from './protocol';
 import { flushSettings, getSetting } from './settings';
 
 let mainWindow: BrowserWindow | null = null;
 let rendererReloaded = false;
-
-function log(message: string): void {
-  process.stderr.write(`[tinydiff] ${message}\n`);
-}
 
 function formatError(error: unknown): string {
   return error instanceof Error ? (error.stack ?? error.message) : String(error);
