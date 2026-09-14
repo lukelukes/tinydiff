@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { app } from 'electron';
@@ -76,6 +76,14 @@ function store<K extends SettingKey>(key: K, value: Settings[K]): void {
   dirty = true;
 }
 
+function discard(temp: string): void {
+  try {
+    rmSync(temp, { force: true });
+  } catch {
+    return;
+  }
+}
+
 function write(): SettingsResult {
   if (!values || !dirty) {
     return { status: 'ok', data: null };
@@ -87,6 +95,7 @@ function write(): SettingsResult {
     writeFileSync(temp, JSON.stringify(values, null, 2));
     renameSync(temp, target);
   } catch (error) {
+    discard(temp);
     const message = `failed to write ${target}: ${error instanceof Error ? error.message : String(error)}`;
     log(message);
     return failure(message);

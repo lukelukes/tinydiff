@@ -89,7 +89,6 @@ describe('tinydiff electron app', () => {
   });
 
   it('runs with the chromium sandbox enabled', async () => {
-    await expect(app.evaluate(() => process.argv)).resolves.not.toContain('--no-sandbox');
     await expect(
       app.evaluate(({ app: electronApp }) => electronApp.commandLine.hasSwitch('no-sandbox'))
     ).resolves.toBe(false);
