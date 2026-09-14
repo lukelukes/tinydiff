@@ -1,63 +1,26 @@
-import type { BrowserWindow, Rectangle } from 'electron';
+import type { BrowserWindow } from 'electron';
 import { screen } from 'electron';
 
+import { log } from './log';
 import { readJson, userDataFile, writeJson } from './storage';
-
-export interface WindowState {
-  bounds: Rectangle;
-  maximized: boolean;
-}
+import type { WindowState } from './window-bounds';
+import { clampToWorkArea, isWindowState } from './window-bounds';
 
 export const DEFAULT_WINDOW_SIZE = { width: 1024, height: 768 };
 
 const SAVE_DELAY_MS = 250;
-const MIN_VISIBLE_PX = 100;
 
 function stateFile(): string {
   return userDataFile('window-state.json');
 }
 
-function isRectangle(value: unknown): value is Rectangle {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const { x, y, width, height } = value as Record<string, unknown>;
-  return (
-    Number.isInteger(x) &&
-    Number.isInteger(y) &&
-    Number.isInteger(width) &&
-    Number.isInteger(height) &&
-    (width as number) > 0 &&
-    (height as number) > 0
-  );
-}
-
-function isWindowState(value: unknown): value is WindowState {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-  const { bounds, maximized } = value as Record<string, unknown>;
-  return isRectangle(bounds) && typeof maximized === 'boolean';
-}
-
-function visibleArea(bounds: Rectangle, area: Rectangle): { width: number; height: number } {
-  return {
-    width: Math.min(bounds.x + bounds.width, area.x + area.width) - Math.max(bounds.x, area.x),
-    height: Math.min(bounds.y + bounds.height, area.y + area.height) - Math.max(bounds.y, area.y)
-  };
-}
-
-function isOnScreen(bounds: Rectangle): boolean {
-  const visible = visibleArea(bounds, screen.getDisplayMatching(bounds).workArea);
-  return visible.width >= MIN_VISIBLE_PX && visible.height >= MIN_VISIBLE_PX;
-}
-
 export function loadWindowState(): WindowState | null {
   const stored = readJson(stateFile());
-  if (!isWindowState(stored) || !isOnScreen(stored.bounds)) {
+  if (!isWindowState(stored)) {
     return null;
   }
-  return stored;
+  const { workArea } = screen.getDisplayMatching(stored.bounds);
+  return { bounds: clampToWorkArea(stored.bounds, workArea), maximized: stored.maximized };
 }
 
 function snapshot(win: BrowserWindow): WindowState {
@@ -76,8 +39,13 @@ export function trackWindowState(win: BrowserWindow): void {
 
   const save = (): void => {
     cancel();
-    if (!win.isDestroyed()) {
+    if (win.isDestroyed()) {
+      return;
+    }
+    try {
       writeJson(stateFile(), snapshot(win));
+    } catch (error) {
+      log(`window state not saved: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
