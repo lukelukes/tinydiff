@@ -4,8 +4,9 @@ import { app, BrowserWindow, session, shell } from 'electron';
 
 import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
 import { applyDevCsp, serveRenderer } from './protocol';
+import { devRendererUrl } from './renderer-url';
 
-const rendererUrl = process.env.ELECTRON_RENDERER_URL;
+const rendererUrl = devRendererUrl(process.env.ELECTRON_RENDERER_URL, app.isPackaged);
 const devOrigin = rendererUrl ? new URL(rendererUrl).origin : null;
 
 let mainWindow: BrowserWindow | null = null;
@@ -13,6 +14,10 @@ let rendererReloaded = false;
 
 function log(message: string): void {
   process.stderr.write(`[tinydiff] ${message}\n`);
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
 function isExternal(url: string): boolean {
@@ -49,7 +54,9 @@ function createWindow(): BrowserWindow {
     }
   });
 
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    win.show();
+  });
 
   win.webContents.on('will-navigate', (event) => {
     if (!isAllowedNavigation(event.url)) {
@@ -68,7 +75,6 @@ function createWindow(): BrowserWindow {
     mainWindow = null;
   });
 
-  void win.loadURL(rendererUrl ?? `${RENDERER_ORIGIN}/`);
   return win;
 }
 
@@ -80,6 +86,25 @@ function focusMainWindow(): void {
     mainWindow.restore();
   }
   mainWindow.focus();
+}
+
+async function start(): Promise<void> {
+  await app.whenReady();
+
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
+    callback(false);
+  });
+  session.defaultSession.setPermissionCheckHandler(() => false);
+
+  if (rendererUrl) {
+    applyDevCsp(process.env[DEV_CSP_NONCE_ENV]);
+  } else {
+    serveRenderer(join(import.meta.dirname, '../renderer'));
+  }
+
+  const win = createWindow();
+  mainWindow = win;
+  await win.loadURL(rendererUrl ?? `${RENDERER_ORIGIN}/`);
 }
 
 function bootstrap(): void {
@@ -111,19 +136,9 @@ function bootstrap(): void {
     app.quit();
   });
 
-  void app.whenReady().then(() => {
-    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
-      callback(false)
-    );
-    session.defaultSession.setPermissionCheckHandler(() => false);
-
-    if (rendererUrl) {
-      applyDevCsp(process.env[DEV_CSP_NONCE_ENV]);
-    } else {
-      serveRenderer(join(import.meta.dirname, '../renderer'));
-    }
-
-    mainWindow = createWindow();
+  start().catch((error: unknown) => {
+    log(`startup failed: ${formatError(error)}`);
+    app.exit(1);
   });
 }
 

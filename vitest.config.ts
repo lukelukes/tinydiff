@@ -11,7 +11,7 @@ export default defineConfig(async (): Promise<ViteUserConfig> => ({
     projects: [
       {
         test: {
-          include: ['src/**/*.{test,spec}.ts'],
+          include: ['src/**/*.{test,spec}.ts', 'electron/**/*.{test,spec}.ts'],
           exclude: ['src/**/*.property.spec.ts'],
           name: 'unit',
           environment: 'node',
