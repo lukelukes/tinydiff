@@ -3,6 +3,11 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 e2e_runner := if env("DISPLAY", "") != "" { "" } else if env("WAYLAND_DISPLAY", "") != "" { "" } else { "xvfb-run -a" }
 
+version := `bun --print "require('./package.json').version"`
+machine := `uname -m`
+appimage := "release/TinyDiff-" + version + "-" + (if machine == "x86_64" { "x86_64" } else { "arm64" }) + ".AppImage"
+deb := "release/TinyDiff-" + version + "-" + (if machine == "x86_64" { "amd64" } else { "arm64" }) + ".deb"
+
 [private]
 addon:
     just napi::build
@@ -35,7 +40,8 @@ e2e-package: package
 
 [group('test')]
 smoke: package
-    TD_SMOKE_APPIMAGE="$(ls release/*.AppImage)" TD_SMOKE_DEB="$(ls release/*.deb)" {{ e2e_runner }} bun vitest run --project e2e e2e/packaged-smoke.spec.ts
+    ls {{ appimage }} {{ deb }} > /dev/null
+    TD_SMOKE_APPIMAGE={{ appimage }} TD_SMOKE_DEB={{ deb }} xvfb-run -a bun vitest run --project e2e e2e/packaged-smoke.spec.ts
 
 [group('dist')]
 package: build
