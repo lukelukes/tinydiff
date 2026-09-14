@@ -7,6 +7,7 @@ version := `bun --print "require('./package.json').version"`
 machine := `uname -m`
 appimage := "release/TinyDiff-" + version + "-" + (if machine == "x86_64" { "x86_64" } else { "arm64" }) + ".AppImage"
 deb := "release/TinyDiff-" + version + "-" + (if machine == "x86_64" { "amd64" } else { "arm64" }) + ".deb"
+unpacked := "release/linux-" + (if machine == "x86_64" { "" } else { "arm64-" }) + "unpacked"
 
 [private]
 addon:
@@ -36,7 +37,8 @@ e2e: build
 
 [group('test')]
 e2e-package: package
-    TD_E2E_BINARY=release/linux-unpacked/tinydiff {{ e2e_runner }} bun vitest run --project e2e
+    ls {{ unpacked }}/tinydiff > /dev/null
+    TD_E2E_BINARY={{ unpacked }}/tinydiff {{ e2e_runner }} bun vitest run --project e2e
 
 [group('test')]
 smoke: package
