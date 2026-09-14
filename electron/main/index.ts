@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, session, shell } from 'electron';
 
 import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
+import { externalUrl } from './external-url';
 import { applyDevCsp, serveRenderer } from './protocol';
 import { devRendererUrl } from './renderer-url';
 
@@ -18,23 +19,11 @@ function formatError(error: unknown): string {
   return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
-function isExternal(url: string): boolean {
-  return url.startsWith('https:') || url.startsWith('http:');
-}
-
-function originOf(url: string): string | null {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return null;
-  }
-}
-
 function isAllowedNavigation(url: string): boolean {
   if (url.startsWith(`${RENDERER_ORIGIN}/`)) {
     return true;
   }
-  return devOrigin !== null && originOf(url) === devOrigin;
+  return devOrigin !== null && URL.parse(url)?.origin === devOrigin;
 }
 
 function createWindow(): BrowserWindow {
@@ -63,8 +52,11 @@ function createWindow(): BrowserWindow {
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isExternal(url)) {
-      void shell.openExternal(url);
+    const external = externalUrl(url);
+    if (external !== null) {
+      shell.openExternal(external).catch((error: unknown) => {
+        log(`failed to open ${external}: ${formatError(error)}`);
+      });
     }
     return { action: 'deny' };
   });
