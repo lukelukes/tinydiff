@@ -1,16 +1,17 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, session, shell } from 'electron';
+import { app, BrowserWindow, session } from 'electron';
 
 import type { AppMode } from '../../src/bindings/types';
 import { describeError, resolveAppMode } from './app-mode';
 import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
 import { devOrigin, rendererUrl } from './env';
-import { externalUrl } from './external-url';
+import { openExternal } from './external';
 import { applyTheme, registerHandlers } from './handlers';
 import { log } from './log';
 import { applyDevCsp, serveRenderer } from './protocol';
 import { flushSettings, getSetting } from './settings';
+import { DEFAULT_WINDOW_SIZE, loadWindowState, trackWindowState } from './window-state';
 
 let mainWindow: BrowserWindow | null = null;
 let rendererReloaded = false;
@@ -27,9 +28,10 @@ function isAllowedNavigation(url: string): boolean {
 }
 
 function createWindow(): BrowserWindow {
+  const state = loadWindowState();
   const win = new BrowserWindow({
-    width: 1024,
-    height: 768,
+    ...DEFAULT_WINDOW_SIZE,
+    ...state?.bounds,
     show: false,
     title: 'TinyDiff',
     backgroundColor: '#18181b',
@@ -42,8 +44,13 @@ function createWindow(): BrowserWindow {
   });
 
   win.once('ready-to-show', () => {
+    if (state?.maximized) {
+      win.maximize();
+    }
     win.show();
   });
+
+  trackWindowState(win);
 
   win.webContents.on('will-navigate', (event) => {
     if (!isAllowedNavigation(event.url)) {
@@ -52,12 +59,9 @@ function createWindow(): BrowserWindow {
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    const external = externalUrl(url);
-    if (external !== null) {
-      shell.openExternal(external).catch((error: unknown) => {
-        log(`failed to open ${external}: ${formatError(error)}`);
-      });
-    }
+    openExternal(url).catch((error: unknown) => {
+      log(`failed to open ${url}: ${formatError(error)}`);
+    });
     return { action: 'deny' };
   });
 

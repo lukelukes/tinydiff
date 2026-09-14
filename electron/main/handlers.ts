@@ -1,6 +1,7 @@
 import { nativeTheme } from 'electron';
 
 import type { AppMode } from '../../src/bindings/types';
+import { openExternal } from './external';
 import type { Handlers } from './ipc';
 import { registerIpc } from './ipc';
 import { native } from './native';
@@ -31,7 +32,8 @@ function createHandlers(appMode: AppMode): Handlers {
       const result = setSetting(key, value);
       applyTheme(getSetting('theme'));
       return result;
-    }
+    },
+    openExternal: (url) => openExternal(url)
   };
 }
 

@@ -39,7 +39,7 @@ const commentsData: CommentCollection = {
     },
     {
       id: 'comment-3',
-      filePath: 'src-tauri/src/comments.rs',
+      filePath: 'crates/tinydiff-core/src/comments.rs',
       anchor: { type: 'pinned', line: 28 },
       body: 'Nice use of the builder pattern here!',
       resolved: false,
@@ -71,10 +71,23 @@ function notFound(filePath: string): CommandError {
   return { type: 'path', path: filePath, message: 'File not found in fixtures' };
 }
 
+function isExternalUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function readSettings(): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-    return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+    return isRecord(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -147,6 +160,13 @@ export function createShim(): TinydiffApi {
     settingsSet(key, value) {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...readSettings(), [key]: value }));
       return Promise.resolve({ status: 'ok', data: null });
+    },
+    openExternal(url) {
+      if (!isExternalUrl(url)) {
+        return Promise.resolve(false);
+      }
+      window.open(url, '_blank', 'noopener');
+      return Promise.resolve(true);
     }
   };
 }

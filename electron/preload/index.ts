@@ -19,7 +19,8 @@ const api: TinydiffApi = {
   getCommentsForFile: (repoPath, filePath, fileContents) =>
     ipcRenderer.invoke(channels.getCommentsForFile, repoPath, filePath, fileContents),
   settingsGet: (key) => ipcRenderer.invoke(channels.settingsGet, key),
-  settingsSet: (key, value) => ipcRenderer.invoke(channels.settingsSet, key, value)
+  settingsSet: (key, value) => ipcRenderer.invoke(channels.settingsSet, key, value),
+  openExternal: (url) => ipcRenderer.invoke(channels.openExternal, url)
 };
 
 contextBridge.exposeInMainWorld('tinydiff', api);

@@ -73,6 +73,11 @@ describe('commands over window.tinydiff', () => {
     );
   });
 
+  it('forwards external urls to the bridge', async () => {
+    await expect(commands.openExternal('https://example.com/')).resolves.toBe(true);
+    expect(fake.openedUrls).toStrictEqual(['https://example.com/']);
+  });
+
   it('round-trips comments through save, load and delete', async () => {
     await expect(commands.saveComment('/repo', comment, null)).resolves.toStrictEqual({
       status: 'ok',

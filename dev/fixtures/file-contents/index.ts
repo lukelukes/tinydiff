@@ -28,8 +28,8 @@ function makeGitFileContents(
   lang: string | null
 ): GitFileContents {
   return {
-    oldFile: makeDiffFile(oldName, oldContent !== null ? textContent(oldContent) : null, lang),
-    newFile: makeDiffFile(newName, newContent !== null ? textContent(newContent) : null, lang)
+    oldFile: makeDiffFile(oldName, oldContent === null ? null : textContent(oldContent), lang),
+    newFile: makeDiffFile(newName, newContent === null ? null : textContent(newContent), lang)
   };
 }
 
@@ -409,7 +409,7 @@ export function CommentDisplay({
     'tsx'
   ),
 
-  'src-tauri/src/comments.rs': makeGitFileContents(
+  'crates/tinydiff-core/src/comments.rs': makeGitFileContents(
     'comments.rs',
     commentsOld,
     'comments.rs',

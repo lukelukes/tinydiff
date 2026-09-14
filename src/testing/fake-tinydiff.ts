@@ -16,6 +16,7 @@ export interface FakeTinydiff extends TinydiffApi {
   gitFileContents: Map<string, FakeResult<GitFileContents>>;
   comments: Comment[];
   settings: Map<string, unknown>;
+  openedUrls: string[];
 }
 
 function ok<T>(data: T): FakeResult<T> {
@@ -32,6 +33,7 @@ export function createFakeTinydiff(): FakeTinydiff {
     gitFileContents: new Map(),
     comments: [],
     settings: new Map(),
+    openedUrls: [],
 
     getAppMode() {
       return Promise.resolve({ type: 'empty' });
@@ -79,6 +81,10 @@ export function createFakeTinydiff(): FakeTinydiff {
     settingsSet(key, value) {
       fake.settings.set(key, value);
       return Promise.resolve({ status: 'ok', data: null });
+    },
+    openExternal(url) {
+      fake.openedUrls.push(url);
+      return Promise.resolve(true);
     }
   };
   return fake;

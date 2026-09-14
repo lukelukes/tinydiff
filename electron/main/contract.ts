@@ -11,7 +11,8 @@ export const channels = {
   deleteComment: 'tinydiff:deleteComment',
   getCommentsForFile: 'tinydiff:getCommentsForFile',
   settingsGet: 'tinydiff:settingsGet',
-  settingsSet: 'tinydiff:settingsSet'
+  settingsSet: 'tinydiff:settingsSet',
+  openExternal: 'tinydiff:openExternal'
 } as const satisfies Record<keyof TinydiffApi, string>;
 
 export function isMethod(name: string): name is keyof TinydiffApi {

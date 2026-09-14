@@ -41,6 +41,7 @@ export interface TinydiffApi {
   ) => Promise<Result<Comment[], CommandError>>;
   settingsGet: (key: string) => Promise<unknown>;
   settingsSet: (key: string, value: unknown) => Promise<Result<null, SettingsError>>;
+  openExternal: (url: string) => Promise<boolean>;
 }
 
 declare global {

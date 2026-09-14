@@ -8,7 +8,6 @@
     "electron/preload/index.ts"
   ],
   "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "*.ts"],
-  "ignore": ["electron/main/assets.d.ts", "src/testing/fake-tauri.ts"],
-  "ignoreDependencies": ["@tauri-apps/*", "@napi-rs/cli"],
+  "ignore": ["electron/main/assets.d.ts"],
   "ignoreExportsUsedInFile": true
 }
