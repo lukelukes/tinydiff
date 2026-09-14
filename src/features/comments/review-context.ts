@@ -1,6 +1,7 @@
 import { createContext, use } from 'react';
 
-import type { Comment } from '../../../tauri-bindings';
+import type { Comment } from '#bindings/index';
+
 import type { CommentSide } from './use-comments';
 
 export interface ReviewActions {

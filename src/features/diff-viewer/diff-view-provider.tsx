@@ -9,7 +9,7 @@ export function DiffViewProvider({ children }: { children: ReactNode }) {
   const [diffStyle, setDiffStyle] = useState<DiffStyle>('split');
 
   useEffect(() => {
-    void settingsStore.get<DiffStyle>('viewMode').then((value) => {
+    void settingsStore.get('viewMode').then((value) => {
       if (value) {
         setDiffStyle(value);
       }

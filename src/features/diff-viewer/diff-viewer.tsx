@@ -5,9 +5,9 @@ import type { DiffLineAnnotation, FileContents, MultiFileDiffProps } from '@pier
 import { MultiFileDiff, Virtualizer } from '@pierre/diffs/react';
 import { useMemo } from 'react';
 
+import type { Comment, DiffFile } from '#bindings/index';
 import { getErrorMessage } from '#core/command-error';
 
-import type { Comment, DiffFile } from '../../../tauri-bindings';
 import type { CommentFormState, CommentSide } from '../comments';
 import { AddCommentButton, CommentDisplay, CommentForm, useReview } from '../comments';
 import type { DiffStyle } from './diff-view-context';

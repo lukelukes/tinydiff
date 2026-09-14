@@ -1,4 +1,4 @@
-import type { CommandError } from '#tauri-bindings/index';
+import type { CommandError } from '#bindings/index';
 
 export function getErrorMessage(error: CommandError): string {
   switch (error.type) {

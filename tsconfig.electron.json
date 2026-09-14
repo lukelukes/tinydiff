@@ -17,5 +17,5 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["electron/**/*.ts", "src/bindings/**/*.ts"]
+  "include": ["electron/**/*.ts", "src/bindings/api.ts", "src/bindings/types.ts"]
 }

@@ -1,15 +1,12 @@
-import { invoke } from '@tauri-apps/api/core';
+import { commands, type AppMode } from '#bindings/index';
 
-export type AppMode =
-  | { type: 'empty' }
-  | { type: 'git'; path: string }
-  | { type: 'file'; fileA: string; fileB: string };
+export type { AppMode };
 
 const DEFAULT_TIMEOUT_MS = 5000;
 
 export function getAppMode(timeoutMs = DEFAULT_TIMEOUT_MS): Promise<AppMode> {
   return Promise.race([
-    invoke<AppMode>('get_app_mode'),
+    commands.getAppMode(),
     new Promise<never>((_, reject) => {
       setTimeout(() => {
         reject(new Error(`App initialization timed out after ${timeoutMs}ms`));

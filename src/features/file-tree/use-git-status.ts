@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { commands, type GitStatus, type CommandError } from '../../../tauri-bindings';
+import { commands, type GitStatus, type CommandError } from '#bindings/index';
 
 type GitStatusState =
   | { status: 'loading' }

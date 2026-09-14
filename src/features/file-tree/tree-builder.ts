@@ -1,4 +1,4 @@
-import type { FileEntry, FileEntryKind, GitStatus } from '../../../tauri-bindings';
+import type { FileEntry, FileEntryKind, GitStatus } from '#bindings/index';
 
 type FileStatus = FileEntryKind['status'];
 

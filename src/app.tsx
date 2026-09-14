@@ -12,6 +12,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { WorkerPoolContextProvider } from '@pierre/diffs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import type { Comment, DiffTarget } from '#bindings/index';
 import type { AppMode } from '#core/app-mode';
 import { getErrorMessage } from '#core/command-error';
 import {
@@ -41,15 +42,13 @@ import {
 import { FileTree, useGitStatus } from '#features/file-tree';
 import { settingsStore } from '#lib/settings-store';
 
-import type { Comment, DiffTarget } from '../tauri-bindings';
-
 import './app.css';
 
 function useTheme() {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   useEffect(() => {
-    void settingsStore.get<'dark' | 'light'>('theme').then((value) => {
+    void settingsStore.get('theme').then((value) => {
       if (value) {
         const dark = value === 'dark';
         setIsDark(dark);

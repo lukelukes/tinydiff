@@ -2,7 +2,8 @@
 import * as fc from 'fast-check';
 import { describe, it } from 'vitest';
 
-import type { GitStatus } from '../../../tauri-bindings';
+import type { GitStatus } from '#bindings/index';
+
 import { buildFileTree, type FileTreeNode } from './tree-builder';
 import { flattenTree, getAllDirectoryPaths, getAllFilePaths, getAllPaths } from './tree-utils';
 

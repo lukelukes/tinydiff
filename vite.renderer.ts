@@ -18,7 +18,7 @@ function devScripts(): Plugin {
         const scripts: HtmlTagDescriptor[] = [
           {
             tag: 'script',
-            attrs: { type: 'module', src: '/dev/tauri-mock.ts' },
+            attrs: { type: 'module', src: '/dev/tinydiff-shim.ts' },
             injectTo: 'head'
           }
         ];

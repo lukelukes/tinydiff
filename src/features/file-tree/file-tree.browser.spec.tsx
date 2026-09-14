@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 import { userEvent } from 'vitest/browser';
 
+import type { DiffTarget, GitStatus } from '#bindings/index';
 import { SidebarProvider } from '#features/components/ui/sidebar';
 
-import type { DiffTarget, GitStatus } from '../../../tauri-bindings';
 import { FileTree } from './file-tree';
 
 function createStatus(files: { path: string; staged?: boolean }[]): GitStatus {

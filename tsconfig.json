@@ -4,6 +4,7 @@
     "useDefineForClassFields": true,
     "module": "ESNext",
     "lib": ["ES2024", "DOM", "DOM.Iterable"],
+    "types": ["node"],
     "skipLibCheck": true,
 
     "moduleResolution": "bundler",
@@ -26,9 +27,15 @@
       "#core/*": ["./src/core/*"],
       "#lib/*": ["./src/lib/*"],
       "#testing/*": ["./src/testing/*"],
-      "#tauri-bindings": ["./tauri-bindings/*"]
+      "#bindings/*": ["./src/bindings/*"]
     }
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "tauri-bindings"]
+  "include": [
+    "src",
+    "e2e",
+    "dev/tinydiff-shim.ts",
+    "dev/fixtures/*.ts",
+    "dev/fixtures/file-contents/index.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
 }
