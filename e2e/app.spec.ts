@@ -67,6 +67,7 @@ describe('tinydiff electron app', () => {
     app = await electron.launch({
       ...(executablePath ? { executablePath } : {}),
       args: executablePath ? [repoDir] : [resolve('out/main/index.js'), repoDir],
+      chromiumSandbox: true,
       env: { ...definedEnv(), XDG_CONFIG_HOME: configDir }
     });
     page = await app.firstWindow();
@@ -84,6 +85,14 @@ describe('tinydiff electron app', () => {
     );
     await expect(page.evaluate(() => typeof globalThis.require)).resolves.toBe('undefined');
     await expect(page.evaluate(() => typeof globalThis.process)).resolves.toBe('undefined');
+    await expect(page.evaluate(() => typeof globalThis.Buffer)).resolves.toBe('undefined');
+  });
+
+  it('runs with the chromium sandbox enabled', async () => {
+    await expect(app.evaluate(() => process.argv)).resolves.not.toContain('--no-sandbox');
+    await expect(
+      app.evaluate(({ app: electronApp }) => electronApp.commandLine.hasSwitch('no-sandbox'))
+    ).resolves.toBe(false);
   });
 
   it('lists the modified file in the file tree', async () => {
@@ -119,5 +128,35 @@ describe('tinydiff electron app', () => {
     const commentsFile = join(repoDir, '.tinydiff', 'comments.json');
     expect(existsSync(commentsFile)).toBe(true);
     expect(readFileSync(commentsFile, 'utf8')).toContain(COMMENT_BODY);
+  });
+
+  it('rejects settings outside the allowlist and persists valid ones', async () => {
+    await expect(
+      page.evaluate(() => {
+        const cyclic: Record<string, unknown> = {};
+        cyclic.self = cyclic;
+        return window.tinydiff.settingsSet('theme', cyclic);
+      })
+    ).resolves.toMatchObject({ status: 'error', error: { type: 'settings' } });
+    await expect(
+      page.evaluate(() => window.tinydiff.settingsSet('viewMode', 'sideways'))
+    ).resolves.toMatchObject({ status: 'error', error: { type: 'settings' } });
+    await expect(
+      page.evaluate(() => window.tinydiff.settingsSet('fontSize', 12))
+    ).resolves.toMatchObject({ status: 'error', error: { type: 'settings' } });
+
+    await expect(
+      page.evaluate(() => window.tinydiff.settingsSet('viewMode', 'unified'))
+    ).resolves.toStrictEqual({ status: 'ok', data: null });
+    await expect(page.evaluate(() => window.tinydiff.settingsGet('viewMode'))).resolves.toBe(
+      'unified'
+    );
+    await expect(page.evaluate(() => window.tinydiff.settingsGet('theme'))).resolves.toBe('dark');
+
+    const settingsFile = join(configDir, 'tinydiff', 'settings.json');
+    expect(JSON.parse(readFileSync(settingsFile, 'utf8'))).toStrictEqual({
+      theme: 'dark',
+      viewMode: 'unified'
+    });
   });
 });

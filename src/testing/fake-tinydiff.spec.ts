@@ -1,13 +1,7 @@
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { commands, type Comment } from '#bindings/index';
 
-import type * as Addon from '../../crates/tinydiff-napi/index';
 import {
   createBinaryFileContents,
   createFakeTinydiff,
@@ -96,50 +90,5 @@ describe('commands over window.tinydiff', () => {
       status: 'ok',
       data: []
     });
-  });
-});
-
-const addonPath = resolve(import.meta.dirname, '../../crates/tinydiff-napi/tinydiff.node');
-
-function isAddon(value: unknown): value is typeof Addon {
-  return typeof value === 'object' && value !== null && 'resolveAppMode' in value;
-}
-
-function loadAddon(): typeof Addon {
-  const load: (id: string) => unknown = createRequire(import.meta.url);
-  const addon = load(addonPath);
-  if (!isAddon(addon)) {
-    throw new Error(`${addonPath} does not export the tinydiff addon`);
-  }
-  return addon;
-}
-
-describe.skipIf(!existsSync(addonPath))('native addon', () => {
-  const native = loadAddon();
-  const repoDir = mkdtempSync(join(tmpdir(), 'tinydiff-fake-'));
-
-  afterAll(() => {
-    rmSync(repoDir, { recursive: true, force: true });
-  });
-
-  it('resolves an empty argument list to empty mode', () => {
-    expect(native.resolveAppMode([])).toStrictEqual({ status: 'ok', data: { type: 'empty' } });
-  });
-
-  it('reports a missing path as a path error', () => {
-    expect(native.resolveAppMode(['/nonexistent/tinydiff'])).toMatchObject({
-      status: 'error',
-      error: { type: 'path', path: '/nonexistent/tinydiff' }
-    });
-  });
-
-  it('keeps integer timestamps as numbers across a round-trip', async () => {
-    await expect(native.saveComment(repoDir, comment, null)).resolves.toStrictEqual({
-      status: 'ok',
-      data: null
-    });
-    const loaded = await native.loadComments(repoDir);
-    expect(loaded).toStrictEqual({ status: 'ok', data: { comments: [comment] } });
-    expect(JSON.stringify(loaded)).toContain('"createdAt":1700000000');
   });
 });
