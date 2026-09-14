@@ -438,6 +438,18 @@ mod tests {
     }
 
     #[test]
+    fn test_libgit2_supports_remote_transports() {
+        let version = git2::Version::get();
+
+        assert!(version.https());
+        assert!(version.ssh());
+
+        let helper = git2::CredentialHelper::new("https://example.invalid/repo.git");
+
+        assert!(helper.username.is_none());
+    }
+
+    #[test]
     fn test_open_repository_current_dir() {
         let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
         let repo_path = Path::new(&manifest_dir).parent().unwrap().parent().unwrap();
