@@ -42,9 +42,10 @@ e2e-package: package
 
 [group('test')]
 smoke: package
-    ls {{ appimage }} {{ deb }} > /dev/null
-    TD_SMOKE_APPIMAGE={{ appimage }} TD_SMOKE_DEB={{ deb }} xvfb-run -a bun vitest run --project e2e e2e/packaged-smoke.spec.ts
+    TD_ARTIFACT_APPIMAGE={{ appimage }} TD_ARTIFACT_DEB={{ deb }} xvfb-run -a bun vitest run --project e2e e2e/packaged-smoke.spec.ts
 
 [group('dist')]
 package: build
     bun run package
+    ls {{ appimage }} {{ deb }} > /dev/null
+    TD_ARTIFACT_APPIMAGE={{ appimage }} TD_ARTIFACT_DEB={{ deb }} bun vitest run --project e2e e2e/packaged-artifacts.spec.ts
