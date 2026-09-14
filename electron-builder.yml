@@ -9,6 +9,9 @@ files:
   - package.json
 asarUnpack:
   - out/main/chunks/*.node
+extraFiles:
+  - from: build/AppRun
+    to: AppRun
 extraResources: []
 npmRebuild: false
 electronFuses:
@@ -26,3 +29,9 @@ linux:
   icon: build/icon.png
   maintainer: Luke Lukes <126602706+lukelukes@users.noreply.github.com>
   artifactName: ${productName}-${version}-${arch}.${ext}
+appImage:
+  executableArgs: []
+deb:
+  fpm:
+    - --exclude
+    - opt/TinyDiff/AppRun
