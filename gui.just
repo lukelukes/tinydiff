@@ -8,6 +8,7 @@ machine := `uname -m`
 appimage := "release/TinyDiff-" + version + "-" + (if machine == "x86_64" { "x86_64" } else { "arm64" }) + ".AppImage"
 deb := "release/TinyDiff-" + version + "-" + (if machine == "x86_64" { "amd64" } else { "arm64" }) + ".deb"
 unpacked := "release/linux-" + (if machine == "x86_64" { "" } else { "arm64-" }) + "unpacked"
+install_image := "debian:13-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132"
 
 [private]
 addon:
@@ -43,6 +44,10 @@ e2e-package: package
 [group('test')]
 smoke: package
     TD_ARTIFACT_APPIMAGE={{ appimage }} TD_ARTIFACT_DEB={{ deb }} xvfb-run -a bun vitest run --project e2e e2e/packaged-smoke.spec.ts
+
+[group('test')]
+deb-install: package
+    TD_ARTIFACT_DEB={{ deb }} TD_INSTALL_IMAGE={{ install_image }} bun vitest run --project e2e e2e/packaged-install.spec.ts
 
 [group('dist')]
 package: build
