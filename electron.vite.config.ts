@@ -17,11 +17,11 @@ function devCspNonce(): string {
 
 export default defineConfig(async ({ command }): Promise<UserConfig> => ({
   main: {
-    build: { rollupOptions: { input: { index: resolve(root, 'electron/main/index.ts') } } }
+    build: { rolldownOptions: { input: { index: resolve(root, 'electron/main/index.ts') } } }
   },
   preload: {
     build: {
-      rollupOptions: {
+      rolldownOptions: {
         input: { index: resolve(root, 'electron/preload/index.ts') },
         output: { format: 'cjs' }
       }
@@ -34,7 +34,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => ({
     html: command === 'serve' ? { cspNonce: devCspNonce() } : undefined,
     build: {
       ...rendererOptions.build,
-      rollupOptions: { input: { index: resolve(root, 'index.html') } }
+      rolldownOptions: { input: { index: resolve(root, 'index.html') } }
     }
   }
 }));
