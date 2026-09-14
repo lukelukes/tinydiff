@@ -1,6 +1,17 @@
 import type { ChildProcess } from 'node:child_process';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -15,6 +26,8 @@ const WINDOW_TITLE = '^TinyDiff$';
 const POLL_INTERVAL = 250;
 const READY_TIMEOUT = 30_000;
 const EXIT_TIMEOUT = 10_000;
+const GLIBC_BASELINE = '2.38';
+const GLIBC_SYMBOL = /GLIBC_(?<version>\d+(?:\.\d+)+)/gu;
 const INSTALL_PREFIX = 'opt/TinyDiff';
 const SANDBOX_HELPER = `${INSTALL_PREFIX}/chrome-sandbox`;
 const POSTINST_TOOLS = {
@@ -196,6 +209,58 @@ function extractDebMember(file: string, prefix: string, dir: string): string {
   return dir;
 }
 
+function isElf(file: string): boolean {
+  const magic = Buffer.alloc(4);
+  const handle = openSync(file, 'r');
+  try {
+    return readSync(handle, magic, 0, 4, 0) === 4 && magic.toString('latin1') === '\u007FELF';
+  } finally {
+    closeSync(handle);
+  }
+}
+
+function compareVersions(left: string, right: string): number {
+  const a = left.split('.').map(Number);
+  const b = right.split('.').map(Number);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const difference = (a[index] ?? 0) - (b[index] ?? 0);
+    if (difference !== 0) {
+      return difference;
+    }
+  }
+  return 0;
+}
+
+function binaries(root: string): string[] {
+  return readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath, entry.name))
+    .filter((file) => isElf(file));
+}
+
+function highestGlibc(root: string): string {
+  const versions = binaries(root).flatMap((file) =>
+    [...run('objdump', ['-p', file]).matchAll(GLIBC_SYMBOL)].map(
+      (match) => match.groups?.version ?? ''
+    )
+  );
+  if (versions.length === 0) {
+    throw new Error(`${root} contains no binary linked against glibc`);
+  }
+  return versions.reduce((highest, version) =>
+    compareVersions(version, highest) > 0 ? version : highest
+  );
+}
+
+function declaredLibcMinimum(control: string): string {
+  const depends = /^Depends:(?<list>.*)$/mu.exec(control)?.groups?.list ?? '';
+  const minimum = /libc6 \(>= (?<version>[\d.]+)\)/u.exec(depends)?.groups?.version;
+  if (minimum === undefined) {
+    throw new Error(`the package declares no libc6 minimum: ${depends.trim()}`);
+  }
+  return minimum;
+}
+
 function userNamespacesAvailable(): boolean {
   try {
     run('unshare', ['--user', '--map-root-user', 'true']);
@@ -269,6 +334,10 @@ describe('packaged artifacts', () => {
       expect(desktop).not.toContain('no-sandbox');
     });
 
+    it('needs no glibc newer than the documented baseline', () => {
+      expect(highestGlibc(root)).toBe(GLIBC_BASELINE);
+    });
+
     it('starts sandboxed against a repository and exits cleanly on SIGTERM', async () => {
       const result = await smoke(resolve(appImage), dirs);
       expect(result.browserArgs).not.toContain('--no-sandbox');
@@ -281,19 +350,29 @@ describe('packaged artifacts', () => {
     let extracted = '';
     let metadata = '';
     let root = '';
+    let control = '';
     let postinst = '';
 
     beforeAll(() => {
       extracted = tempDir('deb');
       metadata = tempDir('deb-control');
       root = extractDebMember(deb, 'data.tar', extracted);
-      postinst = join(extractDebMember(deb, 'control.tar', metadata), 'postinst');
+      control = readFileSync(
+        join(extractDebMember(deb, 'control.tar', metadata), 'control'),
+        'utf8'
+      );
+      postinst = join(metadata, 'postinst');
     });
 
     afterAll(() => {
       for (const dir of [extracted, metadata]) {
         rmSync(dir, { recursive: true, force: true });
       }
+    });
+
+    it('declares the libc6 minimum that the shipped binaries need', () => {
+      expect(highestGlibc(root)).toBe(GLIBC_BASELINE);
+      expect(declaredLibcMinimum(control)).toBe(GLIBC_BASELINE);
     });
 
     it.skipIf(!userNamespacesAvailable())(
