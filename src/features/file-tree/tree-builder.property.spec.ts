@@ -4,7 +4,13 @@ import { describe, it } from 'vitest';
 
 import type { GitStatus } from '../../../tauri-bindings';
 import { buildFileTree, type FileTreeNode } from './tree-builder';
-import { flattenTree, getAllDirectoryPaths, getAllFilePaths, getAllPaths } from './tree-utils';
+import {
+  flattenTree,
+  getAllDirectoryKeys,
+  getAllDirectoryPaths,
+  getAllFilePaths,
+  getAllKeys
+} from './tree-utils';
 
 const lowerAlphaNumChars = Array.from('abcdefghijklmnopqrstuvwxyz0123456789_-');
 const lowerAlphaChars = Array.from('abcdefghijklmnopqrstuvwxyz');
@@ -171,7 +177,7 @@ describe('flattenTree properties', () => {
       fc.property(uniqueFilePathsArb, fc.nat(), (paths, seed) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allDirs = getAllDirectoryPaths(tree);
+        const allDirs = getAllDirectoryKeys(tree);
 
         if (allDirs.size === 0) return true;
 
@@ -179,9 +185,9 @@ describe('flattenTree properties', () => {
         const collapsedDir = dirsArray[seed % dirsArray.length]!;
         const collapsed = new Set([collapsedDir]);
         const flat = flattenTree(tree, collapsed);
-        const flatPaths = flat.map((n) => n.node.path);
+        const flatKeys = flat.map((n) => n.key);
 
-        return !flatPaths.some((p) => p !== collapsedDir && p.startsWith(collapsedDir + '/'));
+        return !flatKeys.some((k) => k !== collapsedDir && k.startsWith(collapsedDir));
       })
     );
   });
@@ -221,20 +227,21 @@ describe('flattenTree properties', () => {
   });
 });
 
-describe('getAllPaths properties', () => {
-  it('returns all file and directory paths', () => {
+describe('getAllKeys properties', () => {
+  it('returns all file and directory keys', () => {
     fc.assert(
       fc.property(uniqueFilePathsArb, (paths) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allPaths = getAllPaths(tree);
+        const allKeys = getAllKeys(tree);
 
         const filePaths = getAllFilePaths(tree);
         const dirPaths = getAllDirectoryPaths(tree);
 
         return (
-          filePaths.every((p) => allPaths.includes(p)) &&
-          [...dirPaths].every((p) => allPaths.includes(p))
+          filePaths.every((p) => allKeys.includes(p)) &&
+          [...dirPaths].every((p) => allKeys.includes(`${p}/`)) &&
+          new Set(allKeys).size === allKeys.length
         );
       })
     );
