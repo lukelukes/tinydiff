@@ -21,6 +21,6 @@ describe('devRendererUrl', () => {
   it('rejects overrides that are not http(s) URLs', () => {
     expect(() => devRendererUrl('file:///tmp/index.html', false)).toThrow('http(s)');
     expect(() => devRendererUrl(`${RENDERER_ORIGIN}/`, false)).toThrow('http(s)');
-    expect(() => devRendererUrl('not a url', false)).toThrow(TypeError);
+    expect(() => devRendererUrl('not a url', false)).toThrow('http(s)');
   });
 });

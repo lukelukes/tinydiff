@@ -6,11 +6,9 @@ import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
 import { applyDevCsp, serveRenderer } from './protocol';
 import { devRendererUrl } from './renderer-url';
 
-const rendererUrl = devRendererUrl(process.env.ELECTRON_RENDERER_URL, app.isPackaged);
-const devOrigin = rendererUrl ? new URL(rendererUrl).origin : null;
-
 let mainWindow: BrowserWindow | null = null;
 let rendererReloaded = false;
+let devOrigin: string | null = null;
 
 function log(message: string): void {
   process.stderr.write(`[tinydiff] ${message}\n`);
@@ -89,6 +87,8 @@ function focusMainWindow(): void {
 }
 
 async function start(): Promise<void> {
+  const rendererUrl = devRendererUrl(process.env.ELECTRON_RENDERER_URL, app.isPackaged);
+  devOrigin = rendererUrl ? new URL(rendererUrl).origin : null;
   await app.whenReady();
 
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
