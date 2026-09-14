@@ -5,7 +5,7 @@ import { describe, it } from 'vitest';
 import type { GitStatus } from '../../../tauri-bindings';
 import { applyKeyboardNav, type NavigationKey, type NavigationState } from './keyboard-nav';
 import { buildFileTree, type FileTreeNode } from './tree-builder';
-import { getAllPaths } from './tree-utils';
+import { getAllKeys, nodeKey } from './tree-utils';
 
 const lowerAlphaNumChars = Array.from('abcdefghijklmnopqrstuvwxyz0123456789_-');
 const lowerAlphaChars = Array.from('abcdefghijklmnopqrstuvwxyz');
@@ -50,13 +50,13 @@ function createGitStatus(paths: string[]): GitStatus {
   };
 }
 
-function getLastPath(nodes: FileTreeNode[]): string | undefined {
+function getLastKey(nodes: FileTreeNode[]): string | undefined {
   const last = nodes.at(-1);
   if (!last) return undefined;
   if (last.type === 'directory' && last.children.length > 0) {
-    return getLastPath(last.children);
+    return getLastKey(last.children);
   }
-  return last.path;
+  return nodeKey(last);
 }
 
 describe('keyboard navigation invariants', () => {
@@ -65,18 +65,18 @@ describe('keyboard navigation invariants', () => {
       fc.property(uniqueFilePathsArb, navKeyArb, (paths, key) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allPaths = getAllPaths(tree);
+        const allKeys = getAllKeys(tree);
 
-        if (allPaths.length === 0) return true;
+        if (allKeys.length === 0) return true;
 
         const state: NavigationState = {
-          focusedPath: allPaths[0]!,
-          collapsedPaths: new Set()
+          focusedKey: allKeys[0]!,
+          collapsedKeys: new Set()
         };
 
         const result = applyKeyboardNav(tree, state, key);
 
-        return result.focusedPath === null || allPaths.includes(result.focusedPath);
+        return result.focusedKey === null || allKeys.includes(result.focusedKey);
       })
     );
   });
@@ -86,20 +86,20 @@ describe('keyboard navigation invariants', () => {
       fc.property(uniqueFilePathsArb, keySequenceArb, (paths, keys) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allPaths = getAllPaths(tree);
+        const allKeys = getAllKeys(tree);
 
-        if (allPaths.length === 0) return true;
+        if (allKeys.length === 0) return true;
 
         let state: NavigationState = {
-          focusedPath: allPaths[0]!,
-          collapsedPaths: new Set()
+          focusedKey: allKeys[0]!,
+          collapsedKeys: new Set()
         };
 
         for (const key of keys) {
           state = applyKeyboardNav(tree, state, key);
         }
 
-        return state.focusedPath === null || allPaths.includes(state.focusedPath);
+        return state.focusedKey === null || allKeys.includes(state.focusedKey);
       })
     );
   });
@@ -109,19 +109,19 @@ describe('keyboard navigation invariants', () => {
       fc.property(uniqueFilePathsArb, fc.nat(), (paths, startIdx) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allPaths = getAllPaths(tree);
+        const allKeys = getAllKeys(tree);
 
-        if (allPaths.length === 0) return true;
+        if (allKeys.length === 0) return true;
 
-        const startPath = allPaths[startIdx % allPaths.length]!;
+        const startKey = allKeys[startIdx % allKeys.length]!;
         const state: NavigationState = {
-          focusedPath: startPath,
-          collapsedPaths: new Set()
+          focusedKey: startKey,
+          collapsedKeys: new Set()
         };
 
         const result = applyKeyboardNav(tree, state, 'Home');
 
-        return result.focusedPath === tree[0]?.path;
+        return result.focusedKey === (tree[0] ? nodeKey(tree[0]) : undefined);
       })
     );
   });
@@ -131,19 +131,19 @@ describe('keyboard navigation invariants', () => {
       fc.property(uniqueFilePathsArb, fc.nat(), (paths, startIdx) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allPaths = getAllPaths(tree);
+        const allKeys = getAllKeys(tree);
 
-        if (allPaths.length === 0) return true;
+        if (allKeys.length === 0) return true;
 
-        const startPath = allPaths[startIdx % allPaths.length]!;
+        const startKey = allKeys[startIdx % allKeys.length]!;
         const state: NavigationState = {
-          focusedPath: startPath,
-          collapsedPaths: new Set()
+          focusedKey: startKey,
+          collapsedKeys: new Set()
         };
 
         const result = applyKeyboardNav(tree, state, 'End');
 
-        return result.focusedPath === getLastPath(tree);
+        return result.focusedKey === getLastKey(tree);
       })
     );
   });
@@ -156,17 +156,17 @@ describe('keyboard navigation invariants', () => {
 
         if (tree.length === 0) return true;
 
-        const lastPath = getLastPath(tree);
-        if (lastPath === undefined) return true;
+        const lastKey = getLastKey(tree);
+        if (lastKey === undefined) return true;
 
         const state: NavigationState = {
-          focusedPath: lastPath,
-          collapsedPaths: new Set()
+          focusedKey: lastKey,
+          collapsedKeys: new Set()
         };
 
         const result = applyKeyboardNav(tree, state, 'ArrowDown');
 
-        return result.focusedPath === tree[0]?.path;
+        return result.focusedKey === (tree[0] ? nodeKey(tree[0]) : undefined);
       })
     );
   });
@@ -179,16 +179,16 @@ describe('keyboard navigation invariants', () => {
 
         if (tree.length === 0) return true;
 
-        const firstPath = tree[0]!.path;
+        const firstKey = nodeKey(tree[0]!);
 
         const state: NavigationState = {
-          focusedPath: firstPath,
-          collapsedPaths: new Set()
+          focusedKey: firstKey,
+          collapsedKeys: new Set()
         };
 
         const result = applyKeyboardNav(tree, state, 'ArrowUp');
 
-        return result.focusedPath === getLastPath(tree);
+        return result.focusedKey === getLastKey(tree);
       })
     );
   });
@@ -203,13 +203,13 @@ describe('keyboard navigation invariants', () => {
         if (!firstDir) return true;
 
         const state: NavigationState = {
-          focusedPath: firstDir.path,
-          collapsedPaths: new Set([firstDir.path])
+          focusedKey: nodeKey(firstDir),
+          collapsedKeys: new Set([nodeKey(firstDir)])
         };
 
         const result = applyKeyboardNav(tree, state, 'ArrowRight');
 
-        return !result.collapsedPaths.has(firstDir.path);
+        return !result.collapsedKeys.has(nodeKey(firstDir));
       })
     );
   });
@@ -224,13 +224,13 @@ describe('keyboard navigation invariants', () => {
         if (!firstDir) return true;
 
         const state: NavigationState = {
-          focusedPath: firstDir.path,
-          collapsedPaths: new Set()
+          focusedKey: nodeKey(firstDir),
+          collapsedKeys: new Set()
         };
 
         const result = applyKeyboardNav(tree, state, 'ArrowLeft');
 
-        return result.collapsedPaths.has(firstDir.path);
+        return result.collapsedKeys.has(nodeKey(firstDir));
       })
     );
   });
@@ -240,13 +240,13 @@ describe('keyboard navigation invariants', () => {
       fc.property(uniqueFilePathsArb, keySequenceArb, (paths, keys) => {
         const status = createGitStatus(paths);
         const tree = buildFileTree(status);
-        const allPaths = getAllPaths(tree);
+        const allKeys = getAllKeys(tree);
 
-        if (allPaths.length === 0) return true;
+        if (allKeys.length === 0) return true;
 
         const initialState: NavigationState = {
-          focusedPath: allPaths[0]!,
-          collapsedPaths: new Set()
+          focusedKey: allKeys[0]!,
+          collapsedKeys: new Set()
         };
 
         let state1 = initialState;
@@ -258,9 +258,9 @@ describe('keyboard navigation invariants', () => {
         }
 
         return (
-          state1.focusedPath === state2.focusedPath &&
-          state1.collapsedPaths.size === state2.collapsedPaths.size &&
-          [...state1.collapsedPaths].every((p) => state2.collapsedPaths.has(p))
+          state1.focusedKey === state2.focusedKey &&
+          state1.collapsedKeys.size === state2.collapsedKeys.size &&
+          [...state1.collapsedKeys].every((p) => state2.collapsedKeys.has(p))
         );
       })
     );

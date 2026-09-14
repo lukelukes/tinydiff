@@ -3,7 +3,7 @@ import { useState } from 'react';
 import type { DiffTarget } from '../../../tauri-bindings';
 import { applyKeyboardNav, type NavigationKey } from './keyboard-nav';
 import type { FileTreeNode } from './tree-builder';
-import { flattenTree, getAllDirectoryPaths } from './tree-utils';
+import { flattenTree, getAllDirectoryKeys } from './tree-utils';
 
 interface UseFileTreeKeyboardOptions {
   tree: FileTreeNode[];
@@ -11,21 +11,20 @@ interface UseFileTreeKeyboardOptions {
 }
 
 export function useFileTreeKeyboard({ tree, onSelectFile }: UseFileTreeKeyboardOptions) {
-  const [collapsedPaths, setCollapsedPaths] = useState<Set<string>>(() => new Set());
-  const [focusedPath, setFocusedPath] = useState<string | null>(null);
-  const allDirectories = getAllDirectoryPaths(tree);
-  const expandedPaths = new Set([...allDirectories].filter((p) => !collapsedPaths.has(p)));
-  const flatNodes = flattenTree(tree, collapsedPaths);
-  const focusedNode =
-    focusedPath === null ? undefined : flatNodes.find((f) => f.node.path === focusedPath);
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => new Set());
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const allDirectories = getAllDirectoryKeys(tree);
+  const expandedKeys = new Set([...allDirectories].filter((k) => !collapsedKeys.has(k)));
+  const flatNodes = flattenTree(tree, collapsedKeys);
+  const focusedNode = focusedKey === null ? undefined : flatNodes.find((f) => f.key === focusedKey);
 
-  const toggleExpanded = (path: string) => {
-    setCollapsedPaths((prev) => {
+  const toggleExpanded = (key: string) => {
+    setCollapsedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
+      if (next.has(key)) {
+        next.delete(key);
       } else {
-        next.add(path);
+        next.add(key);
       }
       return next;
     });
@@ -38,9 +37,9 @@ export function useFileTreeKeyboard({ tree, onSelectFile }: UseFileTreeKeyboardO
   };
 
   const handleNavigation = (key: NavigationKey) => {
-    const result = applyKeyboardNav(tree, { focusedPath, collapsedPaths }, key);
-    if (result.focusedPath !== focusedPath) setFocusedPath(result.focusedPath);
-    if (result.collapsedPaths !== collapsedPaths) setCollapsedPaths(result.collapsedPaths);
+    const result = applyKeyboardNav(tree, { focusedKey, collapsedKeys }, key);
+    if (result.focusedKey !== focusedKey) setFocusedKey(result.focusedKey);
+    if (result.collapsedKeys !== collapsedKeys) setCollapsedKeys(result.collapsedKeys);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -62,7 +61,7 @@ export function useFileTreeKeyboard({ tree, onSelectFile }: UseFileTreeKeyboardO
         e.preventDefault();
         if (!focusedNode) return;
         if (focusedNode.node.type === 'directory') {
-          toggleExpanded(focusedNode.node.path);
+          toggleExpanded(focusedNode.key);
         } else {
           selectFocusedFile();
         }
@@ -71,9 +70,9 @@ export function useFileTreeKeyboard({ tree, onSelectFile }: UseFileTreeKeyboardO
   };
 
   return {
-    focusedPath,
-    setFocusedPath,
-    expandedPaths,
+    focusedKey,
+    setFocusedKey,
+    expandedKeys,
     toggleExpanded,
     handleKeyDown
   };

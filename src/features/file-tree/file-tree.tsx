@@ -22,6 +22,7 @@ import { sidebarMenuButtonVariants } from '#features/components/ui/sidebar-menu-
 
 import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 import { buildFileTree, getStatusLabel, type FileTreeNode } from './tree-builder';
+import { nodeKey } from './tree-utils';
 import { useFileTreeKeyboard } from './use-file-tree-keyboard';
 
 interface FileTreeProps {
@@ -34,7 +35,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const tree = buildFileTree(status);
   const containerRef = useRef<HTMLUListElement>(null);
 
-  const { focusedPath, setFocusedPath, expandedPaths, toggleExpanded, handleKeyDown } =
+  const { focusedKey, setFocusedKey, expandedKeys, toggleExpanded, handleKeyDown } =
     useFileTreeKeyboard({
       tree,
       onSelectFile
@@ -43,9 +44,9 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const treeItemProps = {
     selectedFile,
     onSelectFile,
-    focusedPath,
-    setFocusedPath,
-    expandedPaths,
+    focusedKey,
+    setFocusedKey,
+    expandedKeys,
     toggleExpanded
   };
 
@@ -65,7 +66,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
       className="outline-none"
     >
       {tree.map((node) => (
-        <TreeItem key={node.path} node={node} {...treeItemProps} />
+        <TreeItem key={nodeKey(node)} node={node} {...treeItemProps} />
       ))}
     </SidebarMenu>
   );
@@ -75,10 +76,10 @@ interface TreeItemProps {
   node: FileTreeNode;
   selectedFile: string | null;
   onSelectFile: (path: string, target: DiffTarget) => void;
-  focusedPath: string | null;
-  setFocusedPath: (path: string | null) => void;
-  expandedPaths: Set<string>;
-  toggleExpanded: (path: string) => void;
+  focusedKey: string | null;
+  setFocusedKey: (key: string | null) => void;
+  expandedKeys: Set<string>;
+  toggleExpanded: (key: string) => void;
 }
 
 type TreeItemSharedProps = Omit<TreeItemProps, 'node'>;
@@ -87,14 +88,15 @@ function TreeItem({
   node,
   selectedFile,
   onSelectFile,
-  focusedPath,
-  setFocusedPath,
-  expandedPaths,
+  focusedKey,
+  setFocusedKey,
+  expandedKeys,
   toggleExpanded
 }: TreeItemProps) {
-  const isFocused = focusedPath === node.path;
+  const key = nodeKey(node);
+  const isFocused = focusedKey === key;
   const focus = () => {
-    setFocusedPath(node.path);
+    setFocusedKey(key);
   };
 
   const handleClick = () => {
@@ -107,7 +109,7 @@ function TreeItem({
 
   const handleToggle = () => {
     focus();
-    toggleExpanded(node.path);
+    toggleExpanded(key);
   };
 
   if (node.type === 'file') {
@@ -141,13 +143,13 @@ function TreeItem({
     );
   }
 
-  const expanded = expandedPaths.has(node.path);
+  const expanded = expandedKeys.has(key);
   const childTreeItemProps: TreeItemSharedProps = {
     selectedFile,
     onSelectFile,
-    focusedPath,
-    setFocusedPath,
-    expandedPaths,
+    focusedKey,
+    setFocusedKey,
+    expandedKeys,
     toggleExpanded
   };
 
@@ -178,7 +180,7 @@ function TreeItem({
         <CollapsibleContent>
           <SidebarMenuSub className="pl-5">
             {node.children.map((child) => (
-              <TreeItem key={child.path} node={child} {...childTreeItemProps} />
+              <TreeItem key={nodeKey(child)} node={child} {...childTreeItemProps} />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>
