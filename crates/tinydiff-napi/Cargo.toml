@@ -14,7 +14,7 @@ test = false
 doctest = false
 
 [dependencies]
-tinydiff-core = { path = "../tinydiff-core" }
+tinydiff-core = { path = "../tinydiff-core", features = ["vendored"] }
 napi = { version = "3.12.4", default-features = false, features = ["napi9", "async", "serde-json"] }
 napi-derive = "3.6.5"
 serde = { version = "1.0", features = ["derive"] }
