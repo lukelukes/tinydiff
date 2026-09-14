@@ -32,6 +32,7 @@ linux:
 appImage:
   executableArgs: []
 deb:
+  afterInstall: build/after-install.tpl
   fpm:
     - --exclude
     - opt/TinyDiff/AppRun

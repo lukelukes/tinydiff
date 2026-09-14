@@ -1,10 +1,10 @@
 import type { ChildProcess } from 'node:child_process';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { createRepo } from './repo';
 
@@ -15,6 +15,20 @@ const WINDOW_TITLE = '^TinyDiff$';
 const POLL_INTERVAL = 250;
 const READY_TIMEOUT = 30_000;
 const EXIT_TIMEOUT = 10_000;
+const INSTALL_PREFIX = 'opt/TinyDiff';
+const SANDBOX_HELPER = `${INSTALL_PREFIX}/chrome-sandbox`;
+const POSTINST_TOOLS = {
+  'update-alternatives': 0,
+  'update-mime-database': 0,
+  'update-desktop-database': 0,
+  apparmor_status: 1
+};
+const AFTER_INSTALL_HARNESS = `
+mount --bind "$1/kernel" /proc/sys/kernel
+mount --bind "$1/opt" /opt
+PATH="$1/bin:$PATH" bash "$2" configure > /dev/null 2>&1
+stat -c %a "/${SANDBOX_HELPER}"
+`;
 
 interface Exit {
   code: number | null;
@@ -169,17 +183,59 @@ function extractAppImage(file: string, dir: string): string {
   return join(dir, 'squashfs-root');
 }
 
-function extractDeb(file: string, dir: string): string {
+function extractDebMember(file: string, prefix: string, dir: string): string {
   const archive = resolve(file);
-  const data = run('ar', ['t', archive])
+  const member = run('ar', ['t', archive])
     .split('\n')
-    .find((member) => member.startsWith('data.tar'));
-  if (data === undefined) {
-    throw new Error(`${file} has no data.tar member`);
+    .find((entry) => entry.startsWith(prefix));
+  if (member === undefined) {
+    throw new Error(`${file} has no ${prefix} member`);
   }
-  run('ar', ['x', archive, data], dir);
-  run('tar', ['-xf', data], dir);
+  run('ar', ['x', archive, member], dir);
+  run('tar', ['-xf', member], dir);
   return dir;
+}
+
+function userNamespacesAvailable(): boolean {
+  try {
+    run('unshare', ['--user', '--map-root-user', 'true']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stubTools(stage: string): void {
+  const bin = join(stage, 'bin');
+  mkdirSync(bin, { recursive: true });
+  for (const [tool, status] of Object.entries(POSTINST_TOOLS)) {
+    writeFileSync(join(bin, tool), `#!/bin/sh\nexit ${status}\n`, { mode: 0o755 });
+  }
+}
+
+function sandboxHelperMode(postinst: string, dir: string, unprivilegedUserns: boolean): string {
+  const stage = join(dir, unprivilegedUserns ? 'permitted' : 'restricted');
+  mkdirSync(join(stage, 'kernel'), { recursive: true });
+  mkdirSync(join(stage, INSTALL_PREFIX), { recursive: true });
+  writeFileSync(
+    join(stage, 'kernel/unprivileged_userns_clone'),
+    unprivilegedUserns ? '1\n' : '0\n'
+  );
+  writeFileSync(join(stage, SANDBOX_HELPER), '', { mode: 0o755 });
+  stubTools(stage);
+  return run('unshare', [
+    '--user',
+    '--map-root-user',
+    '--mount',
+    '--propagation',
+    'private',
+    'bash',
+    '-c',
+    AFTER_INSTALL_HARNESS,
+    'after-install',
+    stage,
+    postinst
+  ]).trim();
 }
 
 describe('packaged artifacts', () => {
@@ -192,10 +248,19 @@ describe('packaged artifacts', () => {
   });
 
   describe.skipIf(appImage === '')('appimage', () => {
+    let extracted = '';
+    let root = '';
+
+    beforeAll(() => {
+      extracted = tempDir('appimage');
+      root = extractAppImage(appImage, extracted);
+    });
+
+    afterAll(() => {
+      rmSync(extracted, { recursive: true, force: true });
+    });
+
     it('ships a launcher and desktop entry that never disable the sandbox', () => {
-      const dir = tempDir('appimage');
-      dirs.push(dir);
-      const root = extractAppImage(appImage, dir);
       const launcher = readFileSync(join(root, 'AppRun'), 'utf8');
       const desktop = readFileSync(join(root, 'tinydiff.desktop'), 'utf8');
       expect(launcher).not.toContain('no-sandbox');
@@ -213,12 +278,38 @@ describe('packaged artifacts', () => {
   });
 
   describe.skipIf(deb === '')('deb', () => {
+    let extracted = '';
+    let metadata = '';
+    let root = '';
+    let postinst = '';
+
+    beforeAll(() => {
+      extracted = tempDir('deb');
+      metadata = tempDir('deb-control');
+      root = extractDebMember(deb, 'data.tar', extracted);
+      postinst = join(extractDebMember(deb, 'control.tar', metadata), 'postinst');
+    });
+
+    afterAll(() => {
+      for (const dir of [extracted, metadata]) {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it.skipIf(!userNamespacesAvailable())(
+      'sets the sandbox helper setuid exactly where unprivileged user namespaces are restricted',
+      () => {
+        const dir = tempDir('after-install');
+        dirs.push(dir);
+        expect(readFileSync(postinst, 'utf8')).not.toContain('unshare');
+        expect(sandboxHelperMode(postinst, dir, false)).toBe('4755');
+        expect(sandboxHelperMode(postinst, dir, true)).toBe('755');
+      }
+    );
+
     it('starts sandboxed from the extracted package and exits cleanly on SIGTERM', async () => {
-      const dir = tempDir('deb');
-      dirs.push(dir);
-      const root = extractDeb(deb, dir);
-      expect(existsSync(join(root, 'opt/TinyDiff/AppRun'))).toBe(false);
-      const result = await smoke(join(root, 'opt/TinyDiff/tinydiff'), dirs);
+      expect(existsSync(join(root, INSTALL_PREFIX, 'AppRun'))).toBe(false);
+      const result = await smoke(join(root, INSTALL_PREFIX, 'tinydiff'), dirs);
       expect(result.browserArgs).not.toContain('--no-sandbox');
       expect(result.stderr).not.toMatch(/sandbox/iu);
       expect(result.exit).toStrictEqual({ code: 0, signal: null });
