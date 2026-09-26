@@ -91,7 +91,8 @@
     "vitest/prefer-to-have-been-called-times": "error",
     "vitest/prefer-to-have-length": "error",
     "vitest/prefer-todo": "error",
-    "vitest/require-top-level-describe": "error"
+    "vitest/require-top-level-describe": "error",
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }]
   },
   "overrides": [
     {

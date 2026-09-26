@@ -10,6 +10,30 @@ const IMAGE =
 const PACKAGE = '/artifacts/package.deb';
 const INSTALL_TIMEOUT = 900_000;
 
+const WITHOUT_USER_NAMESPACES = [
+  'unshare',
+  '--user',
+  '--map-users=0:0:65536',
+  '--map-groups=0:0:65536',
+  '--',
+  'bash',
+  '-c',
+  'echo 0 > /proc/sys/user/max_user_namespaces && exec "$@"',
+  'bash'
+];
+
+const NAMESPACE_SANDBOX = { userns: 'yes', helper: '755' };
+const SETUID_SANDBOX = { userns: 'no', helper: '4755' };
+
+const KERNELS = [
+  { kernel: 'the host kernel', entry: [], sandboxes: [NAMESPACE_SANDBOX, SETUID_SANDBOX] },
+  {
+    kernel: 'a kernel that denies user namespaces',
+    entry: WITHOUT_USER_NAMESPACES,
+    sandboxes: [SETUID_SANDBOX]
+  }
+];
+
 interface Report {
   helper: string;
   launcher: string;
@@ -46,14 +70,16 @@ function parse(output: string, log: string): Report {
   };
 }
 
-function install(): Report {
+function install(entry: string[]): Report {
   const result = spawnSync(
     'docker',
     [
       'run',
       '--rm',
+      '--cap-add',
+      'SYS_ADMIN',
       '--security-opt',
-      'seccomp=unconfined',
+      'systempaths=unconfined',
       '--volume',
       `${artifacts().deb}:${PACKAGE}:ro`,
       '--volume',
@@ -61,6 +87,7 @@ function install(): Report {
       '--volume',
       `${resolve('e2e/smoke.sh')}:/smoke.sh:ro`,
       IMAGE,
+      ...entry,
       'bash',
       '/deb-install.sh',
       PACKAGE,
@@ -75,11 +102,11 @@ function install(): Report {
   return parse(result.stdout, result.stderr);
 }
 
-describe('installed package', () => {
+describe.each(KERNELS)('package installed on $kernel', ({ entry, sandboxes }) => {
   let report: Report;
 
   beforeAll(() => {
-    report = install();
+    report = install(entry);
   }, INSTALL_TIMEOUT);
 
   it('resolves every shipped library from the packages it depends on', () => {
@@ -91,13 +118,10 @@ describe('installed package', () => {
   });
 
   it('makes the sandbox helper setuid exactly where an unprivileged user cannot create a user namespace', () => {
-    expect({ userns: report.userns, helper: report.helper }).toBeOneOf([
-      { userns: 'yes', helper: '755' },
-      { userns: 'no', helper: '4755' }
-    ]);
+    expect({ userns: report.userns, helper: report.helper }).toBeOneOf(sandboxes);
   });
 
   it('starts sandboxed for an unprivileged user and exits cleanly on SIGTERM', () => {
-    expect(report).toMatchObject({ started: 'yes' });
+    expect(report.started, report.log).toBe('yes');
   });
 });
