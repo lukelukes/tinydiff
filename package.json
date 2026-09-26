@@ -23,7 +23,7 @@
     "lint:electron": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.electron.json electron",
     "lint:fix": "bun run lint:electron --fix && bun run lint:e2e --fix && bun run lint:node --fix && bun run lint:renderer --fix",
     "lint:node": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.node.json vite.config.ts vite.renderer.ts vitest.config.ts electron.vite.config.ts",
-    "lint:renderer": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.json src public",
+    "lint:renderer": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.json src public dev",
     "postinstall": "install-electron",
     "test": "vitest --run --project unit --project property --project browser",
     "test:browser": "bun vitest run --project browser",
