@@ -128,6 +128,20 @@ describe('tinydiff electron app', () => {
     expect(readFileSync(commentsFile, 'utf8')).toContain(COMMENT_BODY);
   });
 
+  it('survives cyclic native payloads sent from the renderer', async () => {
+    const cyclicCalls = [
+      "(() => { const cyclic = {}; cyclic.self = cyclic; return window.tinydiff.getFileDiff('.', 'a.ts', cyclic).then(() => 'resolved', () => 'rejected'); })()",
+      "(() => { const cyclic = {}; cyclic.self = cyclic; return window.tinydiff.saveComment('.', cyclic, null).then(() => 'resolved', () => 'rejected'); })()"
+    ];
+    const outcomes = await Promise.all(
+      cyclicCalls.map((call): Promise<unknown> => page.evaluate(call))
+    );
+    expect(outcomes).toStrictEqual(['rejected', 'rejected']);
+    await expect(
+      page.evaluate((path) => window.tinydiff.getGitStatus(path), repoDir)
+    ).resolves.toMatchObject({ status: 'ok' });
+  });
+
   it('rejects settings outside the allowlist and persists valid ones', async () => {
     const untypedCalls = [
       "(() => { const cyclic = {}; cyclic.self = cyclic; return window.tinydiff.settingsSet('theme', cyclic); })()",

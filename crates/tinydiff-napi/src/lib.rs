@@ -7,6 +7,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tinydiff_core::commands::{self, CommandError};
+use tinydiff_core::types::DiffTarget;
 
 #[derive(Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
@@ -23,10 +24,18 @@ fn envelope<T: Serialize>(result: Result<T, CommandError>) -> napi::Result<Value
     serde_json::to_value(wrapped).map_err(|e| napi::Error::from_reason(e.to_string()))
 }
 
-fn parse<T: DeserializeOwned>(value: Value) -> Result<T, CommandError> {
-    serde_json::from_value(value).map_err(|e| CommandError::Invalid {
+fn argument<T>(decoded: serde_json::Result<T>) -> Result<T, CommandError> {
+    decoded.map_err(|e| CommandError::Invalid {
         message: format!("Invalid argument: {e}"),
     })
+}
+
+fn json<T: DeserializeOwned>(text: &str) -> Result<T, CommandError> {
+    argument(serde_json::from_str(text))
+}
+
+fn diff_target(target: String) -> Result<DiffTarget, CommandError> {
+    argument(serde_json::from_value(Value::String(target)))
 }
 
 #[napi(ts_return_type = "Result<AppMode, CommandError>")]
@@ -48,9 +57,11 @@ pub async fn get_git_status(path: String) -> napi::Result<Value> {
 pub async fn get_file_diff(
     repo_path: String,
     file_path: String,
-    target: Value,
+    target: String,
 ) -> napi::Result<Value> {
-    envelope(async { commands::get_file_diff(repo_path, file_path, parse(target)?).await }.await)
+    envelope(
+        async { commands::get_file_diff(repo_path, file_path, diff_target(target)?).await }.await,
+    )
 }
 
 #[napi(
@@ -60,19 +71,20 @@ pub async fn get_file_diff(
 pub async fn get_git_file_contents(
     repo_path: String,
     file_path: String,
-    target: Value,
+    target: String,
 ) -> napi::Result<Value> {
     envelope(
-        async { commands::get_git_file_contents(repo_path, file_path, parse(target)?).await }.await,
+        async { commands::get_git_file_contents(repo_path, file_path, diff_target(target)?).await }
+            .await,
     )
 }
 
 #[napi(
-    ts_args_type = "mode: AppMode, filePath: string",
+    ts_args_type = "modeJson: string, filePath: string",
     ts_return_type = "Promise<Result<ReadFileResult, CommandError>>"
 )]
-pub async fn read_file(mode: Value, file_path: String) -> napi::Result<Value> {
-    envelope(async { commands::read_file(&parse(mode)?, file_path).await }.await)
+pub async fn read_file(mode_json: String, file_path: String) -> napi::Result<Value> {
+    envelope(async { commands::read_file(&json(&mode_json)?, file_path).await }.await)
 }
 
 #[napi(ts_return_type = "Promise<Result<CommentCollection, CommandError>>")]
@@ -81,16 +93,17 @@ pub async fn load_comments(repo_path: String) -> napi::Result<Value> {
 }
 
 #[napi(
-    ts_args_type = "repoPath: string, comment: Comment, fileContents: string | null",
+    ts_args_type = "repoPath: string, commentJson: string, fileContents: string | null",
     ts_return_type = "Promise<Result<null, CommandError>>"
 )]
 pub async fn save_comment(
     repo_path: String,
-    comment: Value,
+    comment_json: String,
     file_contents: Option<String>,
 ) -> napi::Result<Value> {
     envelope(
-        async { commands::save_comment(repo_path, parse(comment)?, file_contents).await }.await,
+        async { commands::save_comment(repo_path, json(&comment_json)?, file_contents).await }
+            .await,
     )
 }
 

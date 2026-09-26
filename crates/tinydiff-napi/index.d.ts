@@ -12,8 +12,8 @@ export declare function getGitStatus(path: string): Promise<Result<GitStatus, Co
 
 export declare function loadComments(repoPath: string): Promise<Result<CommentCollection, CommandError>>
 
-export declare function readFile(mode: AppMode, filePath: string): Promise<Result<ReadFileResult, CommandError>>
+export declare function readFile(modeJson: string, filePath: string): Promise<Result<ReadFileResult, CommandError>>
 
 export declare function resolveAppMode(paths: Array<string>): Result<AppMode, CommandError>
 
-export declare function saveComment(repoPath: string, comment: Comment, fileContents: string | null): Promise<Result<null, CommandError>>
+export declare function saveComment(repoPath: string, commentJson: string, fileContents: string | null): Promise<Result<null, CommandError>>

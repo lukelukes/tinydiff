@@ -11,14 +11,16 @@ export function createHandlers(
   appMode: AppMode,
   settings: SettingsStore
 ): TinydiffApi {
+  const modeJson = JSON.stringify(appMode);
   return {
     getAppMode: () => Promise.resolve(appMode),
     getGitStatus: native.getGitStatus,
     getFileDiff: native.getFileDiff,
     getGitFileContents: native.getGitFileContents,
-    readFile: (filePath) => native.readFile(appMode, filePath),
+    readFile: (filePath) => native.readFile(modeJson, filePath),
     loadComments: native.loadComments,
-    saveComment: native.saveComment,
+    saveComment: (repoPath, comment, fileContents) =>
+      native.saveComment(repoPath, JSON.stringify(comment), fileContents),
     deleteComment: native.deleteComment,
     getCommentsForFile: native.getCommentsForFile,
     settingsGet: (key) => Promise.resolve(settings.get(key)),

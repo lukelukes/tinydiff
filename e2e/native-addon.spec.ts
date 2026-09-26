@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -19,6 +20,27 @@ const comment: Comment = {
   createdAt: 1_700_000_000,
   updatedAt: 1_700_000_000
 };
+
+const malformedPayloads = `
+const native = require(process.env.TD_ADDON);
+const cyclic = {};
+cyclic.self = cyclic;
+const deep = '['.repeat(100000) + ']'.repeat(100000);
+const calls = [
+  () => native.getFileDiff('.', 'a.ts', cyclic),
+  () => native.getGitFileContents('.', 'a.ts', cyclic),
+  () => native.readFile(cyclic, 'a.ts'),
+  () => native.saveComment('.', cyclic, null),
+  () => native.readFile(deep, 'a.ts'),
+  () => native.saveComment('.', deep, null)
+];
+Promise.allSettled(calls.map(async (call) => call())).then((results) => {
+  const outcomes = results.map((result) =>
+    result.status === 'rejected' ? 'thrown' : result.value.error.type
+  );
+  process.stdout.write(JSON.stringify(outcomes));
+});
+`;
 
 describe('native addon', () => {
   let native: NativeAddon;
@@ -50,18 +72,41 @@ describe('native addon', () => {
     ).resolves.toMatchObject({ status: 'error', error: { type: 'invalid' } });
   });
 
+  it('rejects cyclic and deeply nested payloads without terminating the host', () => {
+    const child = spawnSync(process.execPath, ['-e', malformedPayloads], {
+      env: { ...process.env, TD_ADDON: addonPath },
+      encoding: 'utf8'
+    });
+    expect({ signal: child.signal, status: child.status }).toStrictEqual({
+      signal: null,
+      status: 0
+    });
+    expect(JSON.parse(child.stdout)).toStrictEqual([
+      'thrown',
+      'thrown',
+      'thrown',
+      'thrown',
+      'invalid',
+      'invalid'
+    ]);
+  });
+
   it('refuses to read files outside file comparison mode', async () => {
-    await expect(native.readFile({ type: 'empty' }, '/etc/hosts')).resolves.toMatchObject({
+    await expect(
+      native.readFile(JSON.stringify({ type: 'empty' }), '/etc/hosts')
+    ).resolves.toMatchObject({
       status: 'error',
       error: { type: 'path', path: '/etc/hosts' }
     });
   });
 
   it('keeps integer timestamps as numbers across a round-trip', async () => {
-    await expect(native.saveComment(repoDir, comment, null)).resolves.toStrictEqual({
-      status: 'ok',
-      data: null
-    });
+    await expect(native.saveComment(repoDir, JSON.stringify(comment), null)).resolves.toStrictEqual(
+      {
+        status: 'ok',
+        data: null
+      }
+    );
     const loaded = await native.loadComments(repoDir);
     expect(loaded).toStrictEqual({ status: 'ok', data: { comments: [comment] } });
     expect(JSON.stringify(loaded)).toContain('"createdAt":1700000000');
