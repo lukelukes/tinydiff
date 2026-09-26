@@ -1,8 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["index.html", "electron.vite.config.ts", "electron/main/index.ts"],
+  "entry": [
+    "index.html",
+    "electron.vite.config.ts",
+    "electron/main/index.ts",
+    "electron/preload/index.ts"
+  ],
   "project": ["src/**/*.{ts,tsx,css}", "electron/**/*.ts", "*.ts"],
-  "ignore": [],
-  "ignoreDependencies": ["@tauri-apps/*"],
+  "ignore": ["electron/main/assets.d.ts", "src/bindings/types.ts"],
+  "ignoreDependencies": ["@tauri-apps/*", "@napi-rs/cli"],
   "ignoreExportsUsedInFile": true
 }

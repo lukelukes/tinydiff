@@ -1,0 +1,45 @@
+import { ipcMain, nativeTheme } from 'electron';
+
+import type { NativeAddon, TinydiffApi } from '../../src/bindings/api';
+import type { AppMode } from '../../src/bindings/types';
+import { channel } from './contract';
+import type { SettingsStore } from './settings';
+import { withinRenderer } from './urls';
+
+export function createHandlers(
+  native: NativeAddon,
+  appMode: AppMode,
+  settings: SettingsStore
+): TinydiffApi {
+  return {
+    getAppMode: () => Promise.resolve(appMode),
+    getGitStatus: native.getGitStatus,
+    getFileDiff: native.getFileDiff,
+    getGitFileContents: native.getGitFileContents,
+    readFile: (filePath) => native.readFile(appMode, filePath),
+    loadComments: native.loadComments,
+    saveComment: native.saveComment,
+    deleteComment: native.deleteComment,
+    getCommentsForFile: native.getCommentsForFile,
+    settingsGet: (key) => Promise.resolve(settings.get(key)),
+    settingsSet: (key, value) => {
+      const result = settings.set(key, value);
+      if (key === 'theme' && result.status === 'ok') {
+        nativeTheme.themeSource = settings.get('theme');
+      }
+      return Promise.resolve(result);
+    }
+  };
+}
+
+export function registerIpc(handlers: TinydiffApi, rendererUrl: string): void {
+  for (const [method, handler] of Object.entries(handlers)) {
+    ipcMain.handle(channel(method), (event, ...args: unknown[]): unknown => {
+      if (!withinRenderer(rendererUrl, event.senderFrame?.url ?? '')) {
+        throw new Error(`${channel(method)} rejected: untrusted sender`);
+      }
+      const result: unknown = Reflect.apply(handler, undefined, args);
+      return result;
+    });
+  }
+}

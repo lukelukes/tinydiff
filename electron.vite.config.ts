@@ -15,6 +15,14 @@ export default defineConfig(({ command }) => ({
   main: {
     build: { rolldownOptions: { input: { index: resolve(root, 'electron/main/index.ts') } } }
   },
+  preload: {
+    build: {
+      rolldownOptions: {
+        input: { index: resolve(root, 'electron/preload/index.ts') },
+        output: { format: 'cjs' }
+      }
+    }
+  },
   renderer: {
     ...renderer,
     root: '.',

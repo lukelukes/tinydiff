@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import type { Comment, CommentCollection, CommandError } from '../../../tauri-bindings';
-import { commands } from '../../../tauri-bindings';
+import type { Comment, CommentCollection, CommandError } from '#bindings/index';
 
 export type CommentSide = 'deletions' | 'additions';
 
@@ -32,7 +31,7 @@ export function useComments(repoPath: string) {
 
   const refresh = useCallback(async () => {
     setState({ status: 'loading' });
-    const result = await commands.loadComments(repoPath);
+    const result = await window.tinydiff.loadComments(repoPath);
     if (result.status === 'ok') {
       setState({ status: 'success', data: result.data });
     } else {
@@ -51,7 +50,7 @@ export function useComments(repoPath: string) {
 
   const saveComment = useCallback(
     async (comment: Comment, fileContents: string | null) => {
-      const result = await commands.saveComment(repoPath, comment, fileContents);
+      const result = await window.tinydiff.saveComment(repoPath, comment, fileContents);
       if (result.status === 'ok') {
         await refresh();
         return { success: true as const };
@@ -76,7 +75,7 @@ export function useComments(repoPath: string) {
           : prev
       );
 
-      const result = await commands.saveComment(repoPath, comment, fileContents);
+      const result = await window.tinydiff.saveComment(repoPath, comment, fileContents);
       if (result.status !== 'ok') {
         setState(previousState);
         return { success: false as const, error: result.error };
@@ -88,7 +87,7 @@ export function useComments(repoPath: string) {
 
   const deleteComment = useCallback(
     async (commentId: string) => {
-      const result = await commands.deleteComment(repoPath, commentId);
+      const result = await window.tinydiff.deleteComment(repoPath, commentId);
       if (result.status === 'ok') {
         await refresh();
         return { success: true as const };

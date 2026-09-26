@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 
-import { commands, type GitStatus, type CommandError } from '../../../tauri-bindings';
+import type { CommandError, GitStatus } from '#bindings/index';
 
 type GitStatusState =
   | { status: 'loading' }
@@ -12,7 +12,7 @@ export function useGitStatus(repoPath: string) {
 
   const refresh = useCallback(async () => {
     setState({ status: 'loading' });
-    const result = await commands.getGitStatus(repoPath);
+    const result = await window.tinydiff.getGitStatus(repoPath);
     if (result.status === 'ok') {
       setState({ status: 'success', data: result.data });
     } else {

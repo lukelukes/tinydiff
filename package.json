@@ -8,9 +8,8 @@
   "imports": {
     "#features/*": "./src/features/*",
     "#core/*": "./src/core/*",
-    "#lib/*": "./src/lib/*",
     "#testing/*": "./src/testing/*",
-    "#tauri-bindings/*": "./tauri-bindings/*.ts"
+    "#bindings/*": "./src/bindings/*.ts"
   },
   "scripts": {
     "build": "tsc && vite build",
@@ -19,21 +18,23 @@
     "fmt": "oxfmt --config oxfmt.json --write",
     "fmt:check": "oxfmt --config oxfmt.json --check",
     "knip": "knip",
-    "lint": "bun run lint:electron && bun run lint:node && bun run lint:renderer",
+    "lint": "bun run lint:electron && bun run lint:e2e && bun run lint:node && bun run lint:renderer",
+    "lint:e2e": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.e2e.json e2e",
     "lint:electron": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.electron.json electron",
-    "lint:fix": "bun run lint:electron --fix && bun run lint:node --fix && bun run lint:renderer --fix",
+    "lint:fix": "bun run lint:electron --fix && bun run lint:e2e --fix && bun run lint:node --fix && bun run lint:renderer --fix",
     "lint:node": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.node.json vite.config.ts vite.renderer.ts vitest.config.ts electron.vite.config.ts",
     "lint:renderer": "oxlint --type-aware --type-check --config oxlint.json -f stylish --tsconfig tsconfig.json src public",
     "postinstall": "install-electron",
     "tauri": "tauri",
-    "test": "vitest --run",
+    "test": "vitest --run --project unit --project property --project browser",
     "test:browser": "bun vitest run --project browser",
     "test:browser:headed": "HEADED=true bun vitest run --project browser",
+    "test:e2e": "bun vitest run --project e2e",
     "test:property": "bun vitest run --project property",
     "test:unit": "bun vitest run --project unit",
     "test:watch": "bun vitest",
     "typecheck": "tsc && bun run typecheck:electron",
-    "typecheck:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.node.json",
+    "typecheck:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.e2e.json && tsc -p tsconfig.node.json",
     "upgrade-deps": "bunx npm-check-updates -i",
     "validate": "bun run fmt && bun run lint:fix && concurrently -g 'bun:build --logLevel warn' 'bun:electron:build --logLevel warn' 'bun:typecheck:electron' 'bun:test'"
   },

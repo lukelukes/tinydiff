@@ -1,6 +1,8 @@
 import { createContext, use } from 'react';
 
-export type DiffStyle = 'split' | 'unified';
+import type { Settings } from '#bindings/index';
+
+export type DiffStyle = Settings['viewMode'];
 
 export interface DiffViewContextValue {
   diffStyle: DiffStyle;

@@ -1,12 +1,5 @@
-import type { CommandError } from '#tauri-bindings/index';
+import type { CommandError } from '#bindings/index';
 
 export function getErrorMessage(error: CommandError): string {
-  switch (error.type) {
-    case 'path':
-      return error.message;
-    case 'utf8':
-      return `UTF-8 encoding error for ${error.path}`;
-    case 'git':
-      return error.message;
-  }
+  return error.type === 'utf8' ? `UTF-8 encoding error for ${error.path}` : error.message;
 }
