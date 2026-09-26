@@ -10,26 +10,20 @@ const IMAGE =
 const PACKAGE = '/artifacts/package.deb';
 const INSTALL_TIMEOUT = 900_000;
 
-const WITHOUT_USER_NAMESPACES = [
-  'unshare',
-  '--user',
-  '--map-users=0:0:65536',
-  '--map-groups=0:0:65536',
-  '--',
-  'bash',
-  '-c',
-  'echo 0 > /proc/sys/user/max_user_namespaces && exec "$@"',
-  'bash'
-];
-
 const NAMESPACE_SANDBOX = { userns: 'yes', helper: '755' };
 const SETUID_SANDBOX = { userns: 'no', helper: '4755' };
 
 const KERNELS = [
-  { kernel: 'the host kernel', entry: [], sandboxes: [NAMESPACE_SANDBOX, SETUID_SANDBOX] },
+  {
+    kernel: 'the host kernel',
+    docker: [],
+    entry: [],
+    sandboxes: [NAMESPACE_SANDBOX, SETUID_SANDBOX]
+  },
   {
     kernel: 'a kernel that denies user namespaces',
-    entry: WITHOUT_USER_NAMESPACES,
+    docker: ['--security-opt', 'systempaths=unconfined', '--security-opt', 'apparmor=unconfined'],
+    entry: ['bash', '/without-user-namespaces.sh'],
     sandboxes: [SETUID_SANDBOX]
   }
 ];
@@ -70,7 +64,7 @@ function parse(output: string, log: string): Report {
   };
 }
 
-function install(entry: string[]): Report {
+function install(docker: string[], entry: string[]): Report {
   const result = spawnSync(
     'docker',
     [
@@ -78,14 +72,15 @@ function install(entry: string[]): Report {
       '--rm',
       '--cap-add',
       'SYS_ADMIN',
-      '--security-opt',
-      'systempaths=unconfined',
+      ...docker,
       '--volume',
       `${artifacts().deb}:${PACKAGE}:ro`,
       '--volume',
       `${resolve('e2e/deb-install.sh')}:/deb-install.sh:ro`,
       '--volume',
       `${resolve('e2e/smoke.sh')}:/smoke.sh:ro`,
+      '--volume',
+      `${resolve('e2e/without-user-namespaces.sh')}:/without-user-namespaces.sh:ro`,
       IMAGE,
       ...entry,
       'bash',
@@ -102,11 +97,11 @@ function install(entry: string[]): Report {
   return parse(result.stdout, result.stderr);
 }
 
-describe.each(KERNELS)('package installed on $kernel', ({ entry, sandboxes }) => {
+describe.each(KERNELS)('package installed on $kernel', ({ docker, entry, sandboxes }) => {
   let report: Report;
 
   beforeAll(() => {
-    report = install(entry);
+    report = install(docker, entry);
   }, INSTALL_TIMEOUT);
 
   it('resolves every shipped library from the packages it depends on', () => {
