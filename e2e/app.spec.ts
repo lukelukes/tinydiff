@@ -2,7 +2,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
+import type { Rectangle } from 'electron';
 import type { ElectronApplication, Page } from 'playwright';
 import { _electron as electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -21,6 +23,9 @@ const MODIFIED = `export function greet(name: string, excited = false): string {
 `;
 
 const COMMENT_BODY = 'Consider defaulting excited to true';
+
+const RESTORED_BOUNDS = { x: 40, y: 50, width: 900, height: 640 };
+const STATE_SAVE_SETTLE_MS = 1000;
 
 function definedEnv(): Record<string, string> {
   const entries = Object.entries(process.env).filter(
@@ -46,6 +51,46 @@ function createRepo(): string {
   return dir;
 }
 
+function launch(repoDir: string, userDataDir: string): Promise<ElectronApplication> {
+  const executablePath = process.env.TD_E2E_BINARY;
+  const appArgs = [`--user-data-dir=${userDataDir}`, repoDir];
+  return electron.launch({
+    ...(executablePath ? { executablePath } : {}),
+    args: executablePath ? appArgs : [resolve('out/main/index.js'), ...appArgs],
+    chromiumSandbox: true,
+    env: definedEnv()
+  });
+}
+
+async function withApp<T>(
+  repoDir: string,
+  userDataDir: string,
+  run: (target: ElectronApplication) => Promise<T>
+): Promise<T> {
+  const target = await launch(repoDir, userDataDir);
+  try {
+    return await run(target);
+  } finally {
+    await target.close();
+  }
+}
+
+interface WindowState {
+  bounds: Rectangle;
+  maximized: boolean;
+}
+
+async function windowState(target: ElectronApplication): Promise<WindowState> {
+  await target.firstWindow();
+  return target.evaluate(({ BrowserWindow }) => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (win === undefined) {
+      throw new Error('no window');
+    }
+    return { bounds: win.getNormalBounds(), maximized: win.isMaximized() };
+  });
+}
+
 describe('tinydiff electron app', () => {
   let repoDir: string;
   let userDataDir: string;
@@ -55,14 +100,7 @@ describe('tinydiff electron app', () => {
   beforeAll(async () => {
     repoDir = createRepo();
     userDataDir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-user-data-'));
-    const executablePath = process.env.TD_E2E_BINARY;
-    const appArgs = [`--user-data-dir=${userDataDir}`, repoDir];
-    app = await electron.launch({
-      ...(executablePath ? { executablePath } : {}),
-      args: executablePath ? appArgs : [resolve('out/main/index.js'), ...appArgs],
-      chromiumSandbox: true,
-      env: definedEnv()
-    });
+    app = await launch(repoDir, userDataDir);
     page = await app.firstWindow();
   });
 
@@ -166,6 +204,43 @@ describe('tinydiff electron app', () => {
     expect(JSON.parse(readFileSync(settingsFile, 'utf8'))).toStrictEqual({
       theme: 'dark',
       viewMode: 'unified'
+    });
+  });
+});
+
+describe('tinydiff window state', () => {
+  let repoDir: string;
+  let userDataDir: string;
+
+  beforeAll(() => {
+    repoDir = createRepo();
+    userDataDir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-window-state-'));
+  });
+
+  afterAll(() => {
+    rmSync(repoDir, { recursive: true, force: true });
+    rmSync(userDataDir, { recursive: true, force: true });
+  });
+
+  it('restores the bounds and maximized state of the previous launch', async () => {
+    const saved = await withApp(repoDir, userDataDir, async (first) => {
+      await windowState(first);
+      await first.evaluate(({ BrowserWindow }, bounds) => {
+        BrowserWindow.getAllWindows()[0]?.setBounds(bounds);
+      }, RESTORED_BOUNDS);
+      await expect
+        .poll(async () => (await windowState(first)).bounds)
+        .toMatchObject({ width: RESTORED_BOUNDS.width, height: RESTORED_BOUNDS.height });
+      await first.evaluate(({ BrowserWindow }) => {
+        BrowserWindow.getAllWindows()[0]?.maximize();
+      });
+      await expect.poll(async () => (await windowState(first)).maximized).toBe(true);
+      await sleep(STATE_SAVE_SETTLE_MS);
+      return windowState(first);
+    });
+
+    await withApp(repoDir, userDataDir, async (second) => {
+      await expect.poll(() => windowState(second)).toStrictEqual(saved);
     });
   });
 });
