@@ -1,48 +1,31 @@
-import { cpSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { cpSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { flipFuses, FuseV1Options, FuseVersion, getCurrentFuseWire } from '@electron/fuses';
-import { FuseState } from '@electron/fuses/dist/constants';
+import { flipFuses, FuseV1Options, FuseVersion } from '@electron/fuses';
+import type { TestProject } from 'vitest/node';
 
-export interface PackagedBinary {
-  executablePath: string;
-  dispose: () => void;
-}
+import { artifacts, EXECUTABLE, tempDir } from './artifacts';
 
-const SHIPPED_FUSES: ReadonlyArray<[FuseV1Options, boolean]> = [
-  [FuseV1Options.RunAsNode, false],
-  [FuseV1Options.EnableNodeOptionsEnvironmentVariable, false],
-  [FuseV1Options.EnableNodeCliInspectArguments, false],
-  [FuseV1Options.OnlyLoadAppFromAsar, true],
-  [FuseV1Options.EnableCookieEncryption, true]
-];
-
-async function assertShippedFuses(binary: string): Promise<void> {
-  const wire = await getCurrentFuseWire(binary);
-  const wrong = SHIPPED_FUSES.filter(
-    ([option, enabled]) => (wire[option] === FuseState.ENABLE) !== enabled
-  ).map(([option, enabled]) => `${FuseV1Options[option]} should be ${enabled ? 'on' : 'off'}`);
-  if (wrong.length > 0) {
-    throw new Error(`${binary} ships with unexpected fuses: ${wrong.join(', ')}`);
+declare module 'vitest' {
+  export interface ProvidedContext {
+    packagedExecutable?: string;
   }
 }
 
-export async function inspectablePackagedBinary(binary: string): Promise<PackagedBinary> {
-  const source = resolve(binary);
-  await assertShippedFuses(source);
-  const dir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-binary-'));
+export default async function inspectablePackagedBinary(project: TestProject): Promise<() => void> {
+  const dir = tempDir('unpacked');
   const dispose = (): void => {
     rmSync(dir, { recursive: true, force: true });
   };
   try {
-    cpSync(dirname(source), dir, { recursive: true });
-    const executablePath = join(dir, basename(source));
+    cpSync(artifacts().unpacked, dir, { recursive: true });
+    const executablePath = join(dir, EXECUTABLE);
     await flipFuses(executablePath, {
       version: FuseVersion.V1,
       [FuseV1Options.EnableNodeCliInspectArguments]: true
     });
-    return { executablePath, dispose };
+    project.provide('packagedExecutable', executablePath);
+    return dispose;
   } catch (error) {
     dispose();
     throw error;

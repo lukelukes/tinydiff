@@ -1,4 +1,5 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -6,15 +7,24 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { Rectangle } from 'electron';
 import type { ElectronApplication, Page } from 'playwright';
 import { _electron as electron } from 'playwright';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-
-import type { PackagedBinary } from './packaged-binary';
-import { inspectablePackagedBinary } from './packaged-binary';
-import { createRepo, FILE_NAME } from './repo';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 declare global {
   var openedExternally: string[] | undefined;
 }
+
+const FILE_NAME = 'greeter.ts';
+
+const ORIGINAL = `export function greet(name: string): string {
+  return \`hello \${name}\`;
+}
+`;
+
+const MODIFIED = `export function greet(name: string, excited = false): string {
+  const punctuation = excited ? '!' : '.';
+  return \`hello \${name}\${punctuation}\`;
+}
+`;
 
 const COMMENT_BODY = 'Consider defaulting excited to true';
 
@@ -37,19 +47,25 @@ function definedEnv(): Record<string, string> {
   return Object.fromEntries(entries);
 }
 
-let packaged: PackagedBinary | undefined;
+function git(cwd: string, args: string[]): void {
+  execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', ...args], {
+    cwd,
+    stdio: 'ignore'
+  });
+}
 
-beforeAll(async () => {
-  const binary = process.env.TD_E2E_BINARY;
-  packaged = binary === undefined ? undefined : await inspectablePackagedBinary(binary);
-});
-
-afterAll(() => {
-  packaged?.dispose();
-});
+function createRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-repo-'));
+  git(dir, ['init', '-q']);
+  writeFileSync(join(dir, FILE_NAME), ORIGINAL);
+  git(dir, ['add', FILE_NAME]);
+  git(dir, ['commit', '-q', '-m', 'initial']);
+  writeFileSync(join(dir, FILE_NAME), MODIFIED);
+  return dir;
+}
 
 function launch(repoDir: string, userDataDir: string): Promise<ElectronApplication> {
-  const executablePath = packaged?.executablePath;
+  const executablePath = inject('packagedExecutable');
   const appArgs = [`--user-data-dir=${userDataDir}`, repoDir];
   return electron.launch({
     ...(executablePath ? { executablePath } : {}),
