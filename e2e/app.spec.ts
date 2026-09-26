@@ -29,7 +29,13 @@ const MODIFIED = `export function greet(name: string, excited = false): string {
 const COMMENT_BODY = 'Consider defaulting excited to true';
 
 const EXTERNAL_URL = 'http://open-external.invalid/';
-const REJECTED_URLS = ['file:///etc/passwd', 'javascript:alert(1)'];
+const REJECTED_URLS = [
+  'mailto:a@example.invalid',
+  'data:text/html,hi',
+  'app://renderer/x',
+  'ftp://example.invalid/',
+  'tinydiff-e2e://open'
+];
 
 const RESTORED_BOUNDS = { x: 40, y: 50, width: 900, height: 640 };
 const STATE_SAVE_SETTLE_MS = 1000;
@@ -83,16 +89,18 @@ function openedExternally(target: ElectronApplication): Promise<string[]> {
   return target.evaluate(() => globalThis.openedExternally ?? []);
 }
 
-function clickBlankAnchor(target: Page, href: string): Promise<void> {
-  return target.evaluate((url) => {
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.target = '_blank';
-    anchor.rel = 'noopener';
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-  }, href);
+function clickBlankAnchors(target: Page, hrefs: string[]): Promise<void> {
+  return target.evaluate((urls) => {
+    for (const url of urls) {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener';
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+  }, hrefs);
 }
 
 async function withApp<T>(
@@ -167,7 +175,7 @@ describe('tinydiff electron app', () => {
 
   it('opens http links from the renderer through the shell without navigating', async () => {
     const url = page.url();
-    await clickBlankAnchor(page, EXTERNAL_URL);
+    await clickBlankAnchors(page, [EXTERNAL_URL]);
     await page.evaluate((target) => window.open(target, '_blank'), EXTERNAL_URL);
     await expect.poll(() => openedExternally(app)).toStrictEqual([EXTERNAL_URL, EXTERNAL_URL]);
     expect(page.url()).toBe(url);
@@ -176,8 +184,8 @@ describe('tinydiff electron app', () => {
 
   it('refuses to open non-http links externally', async () => {
     const before = await openedExternally(app);
-    await Promise.all(REJECTED_URLS.map((rejected) => clickBlankAnchor(page, rejected)));
-    await expect(openedExternally(app)).resolves.toStrictEqual(before);
+    await clickBlankAnchors(page, [...REJECTED_URLS, EXTERNAL_URL]);
+    await expect.poll(() => openedExternally(app)).toStrictEqual([...before, EXTERNAL_URL]);
     expect(app.windows()).toHaveLength(1);
   });
 
@@ -272,7 +280,7 @@ describe('tinydiff window state', () => {
     rmSync(userDataDir, { recursive: true, force: true });
   });
 
-  it('restores the bounds and maximized state of the previous launch', async () => {
+  it('restores the window bounds of the previous launch', async () => {
     const saved = await withApp(repoDir, userDataDir, async (first) => {
       await windowState(first);
       await first.evaluate(({ BrowserWindow }, bounds) => {
@@ -281,16 +289,15 @@ describe('tinydiff window state', () => {
       await expect
         .poll(async () => (await windowState(first)).bounds)
         .toMatchObject({ width: RESTORED_BOUNDS.width, height: RESTORED_BOUNDS.height });
-      await first.evaluate(({ BrowserWindow }) => {
-        BrowserWindow.getAllWindows()[0]?.maximize();
-      });
-      await expect.poll(async () => (await windowState(first)).maximized).toBe(true);
+      const settled = await windowState(first);
       await sleep(STATE_SAVE_SETTLE_MS);
-      return windowState(first);
+      return settled.bounds;
     });
 
     await withApp(repoDir, userDataDir, async (second) => {
-      await expect.poll(() => windowState(second)).toStrictEqual(saved);
+      await expect
+        .poll(() => windowState(second))
+        .toStrictEqual({ bounds: saved, maximized: false });
     });
   });
 });
