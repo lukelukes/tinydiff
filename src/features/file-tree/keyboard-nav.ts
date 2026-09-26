@@ -1,59 +1,54 @@
 import type { FileTreeNode } from './tree-builder';
-import { flattenTree, nodeKey } from './tree-utils';
+import { flattenTree } from './tree-utils';
 
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End';
 
 export interface NavigationState {
-  focusedKey: string | null;
-  collapsedKeys: Set<string>;
-}
-
-export interface NavigationResult {
-  focusedKey: string | null;
-  collapsedKeys: Set<string>;
+  focusedId: string | null;
+  collapsedIds: ReadonlySet<string>;
 }
 
 export function applyKeyboardNav(
   tree: FileTreeNode[],
   state: NavigationState,
   key: NavigationKey
-): NavigationResult {
-  const { focusedKey, collapsedKeys } = state;
-  const flatNodes = flattenTree(tree, collapsedKeys);
+): NavigationState {
+  const { focusedId, collapsedIds } = state;
+  const flatNodes = flattenTree(tree, collapsedIds);
 
   if (flatNodes.length === 0) {
     return state;
   }
 
-  const currentIndex = focusedKey === null ? -1 : flatNodes.findIndex((f) => f.key === focusedKey);
+  const currentIndex =
+    focusedId === null ? -1 : flatNodes.findIndex((f) => f.node.id === focusedId);
   const currentFlat = currentIndex >= 0 ? flatNodes[currentIndex] : null;
   const move = (step: number) => {
     const nextIndex = (currentIndex + step + flatNodes.length) % flatNodes.length;
-    return flatNodes[nextIndex]?.key ?? focusedKey;
+    return flatNodes[nextIndex]?.node.id ?? focusedId;
   };
 
   switch (key) {
     case 'ArrowDown':
-      return { focusedKey: move(1), collapsedKeys };
+      return { focusedId: move(1), collapsedIds };
     case 'ArrowUp':
-      return { focusedKey: move(-1), collapsedKeys };
+      return { focusedId: move(-1), collapsedIds };
     case 'Home':
-      return { focusedKey: flatNodes[0]?.key ?? focusedKey, collapsedKeys };
+      return { focusedId: flatNodes[0]?.node.id ?? focusedId, collapsedIds };
     case 'End':
-      return { focusedKey: flatNodes.at(-1)?.key ?? focusedKey, collapsedKeys };
+      return { focusedId: flatNodes.at(-1)?.node.id ?? focusedId, collapsedIds };
 
     case 'ArrowRight': {
       if (!currentFlat || currentFlat.node.type !== 'directory') {
         return state;
       }
 
-      if (collapsedKeys.has(currentFlat.key)) {
-        const newCollapsed = new Set(collapsedKeys);
-        newCollapsed.delete(currentFlat.key);
-        return { focusedKey, collapsedKeys: newCollapsed };
+      if (collapsedIds.has(currentFlat.node.id)) {
+        const newCollapsed = new Set(collapsedIds);
+        newCollapsed.delete(currentFlat.node.id);
+        return { focusedId, collapsedIds: newCollapsed };
       }
-      const firstChild = currentFlat.node.children[0];
-      return { focusedKey: firstChild ? nodeKey(firstChild) : focusedKey, collapsedKeys };
+      return { focusedId: currentFlat.node.children[0]?.id ?? focusedId, collapsedIds };
     }
 
     case 'ArrowLeft': {
@@ -61,10 +56,10 @@ export function applyKeyboardNav(
         return state;
       }
 
-      if (currentFlat.node.type === 'directory' && !collapsedKeys.has(currentFlat.key)) {
-        return { focusedKey, collapsedKeys: new Set([...collapsedKeys, currentFlat.key]) };
+      if (currentFlat.node.type === 'directory' && !collapsedIds.has(currentFlat.node.id)) {
+        return { focusedId, collapsedIds: new Set([...collapsedIds, currentFlat.node.id]) };
       }
-      return { focusedKey: currentFlat.parentKey ?? focusedKey, collapsedKeys };
+      return { focusedId: currentFlat.parentId ?? focusedId, collapsedIds };
     }
   }
 }

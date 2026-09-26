@@ -2,58 +2,11 @@
 import * as fc from 'fast-check';
 import { describe, it } from 'vitest';
 
+import { gitStatusArb } from '#testing/git-status-arbitrary';
+
 import type { GitStatus } from '../../../tauri-bindings';
-import { buildFileTree, type FileTreeNode } from './tree-builder';
-import {
-  flattenTree,
-  getAllDirectoryKeys,
-  getAllDirectoryPaths,
-  getAllFilePaths,
-  getAllKeys
-} from './tree-utils';
-
-const lowerAlphaNumChars = Array.from('abcdefghijklmnopqrstuvwxyz0123456789_-');
-const lowerAlphaChars = Array.from('abcdefghijklmnopqrstuvwxyz');
-
-const fileNameArb = fc
-  .tuple(
-    fc.constantFrom(...lowerAlphaChars),
-    fc.string({ unit: fc.constantFrom(...lowerAlphaNumChars), minLength: 0, maxLength: 10 })
-  )
-  .map(([first, rest]) => first + rest);
-
-const extensionArb = fc.constantFrom('.ts', '.tsx', '.js', '.json', '.md', '');
-
-const filePathArb = fc
-  .tuple(fc.array(fileNameArb, { minLength: 0, maxLength: 4 }), fileNameArb, extensionArb)
-  .map(([dirs, name, ext]) => [...dirs, `${name}${ext}`].join('/'));
-
-const uniqueFilePathsArb = fc
-  .array(filePathArb, { minLength: 0, maxLength: 30 })
-  .map((paths) => Array.from(new Set(paths)));
-
-function createGitStatus(paths: string[]): GitStatus {
-  return {
-    staged: [],
-    unstaged: paths.map((path) => ({
-      path,
-      kind: { status: 'modified' as const }
-    })),
-    untracked: []
-  };
-}
-
-function countFiles(nodes: FileTreeNode[]): number {
-  let count = 0;
-  for (const node of nodes) {
-    if (node.type === 'file') {
-      count++;
-    } else {
-      count += countFiles(node.children);
-    }
-  }
-  return count;
-}
+import { buildFileTree, type FileNode, type FileTreeNode } from './tree-builder';
+import { flattenTree } from './tree-utils';
 
 function checkSorting(nodes: FileTreeNode[]): boolean {
   let seenFile = false;
@@ -93,54 +46,66 @@ function collectAllNodes(nodes: FileTreeNode[]): FileTreeNode[] {
   return result;
 }
 
+function collectFiles(nodes: FileTreeNode[]): FileNode[] {
+  return collectAllNodes(nodes).filter((n) => n.type === 'file');
+}
+
+function inputEntries(status: GitStatus): string[] {
+  return [
+    ...status.staged.map((f) => `staged ${f.path}`),
+    ...status.unstaged.map((f) => `unstaged ${f.path}`),
+    ...status.untracked.map((f) => `unstaged ${f.path}`)
+  ].toSorted();
+}
+
 describe('buildFileTree properties', () => {
   it('file nodes never have children property', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const tree = buildFileTree(createGitStatus(paths));
-        return collectAllNodes(tree)
-          .filter((n) => n.type === 'file')
-          .every((f) => !('children' in f));
+      fc.property(gitStatusArb, (status) => {
+        const tree = buildFileTree(status);
+        return collectFiles(tree).every((f) => !('children' in f));
       })
     );
   });
 
-  it('directory nodes never have kind or isStaged properties', () => {
+  it('directory nodes never have kind or target properties', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const tree = buildFileTree(createGitStatus(paths));
+      fc.property(gitStatusArb, (status) => {
+        const tree = buildFileTree(status);
         return collectAllNodes(tree)
           .filter((n) => n.type === 'directory')
-          .every((d) => !('kind' in d) && !('isStaged' in d));
+          .every((d) => !('kind' in d) && !('target' in d));
       })
     );
   });
 
-  it('preserves all file paths from input', () => {
+  it('emits exactly one file node per input entry, with its target', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, (status) => {
         const tree = buildFileTree(status);
-        const outputPaths = getAllFilePaths(tree);
-        return paths.every((p) => outputPaths.includes(p));
+        const output = collectFiles(tree)
+          .map((f) => `${f.target} ${f.path}`)
+          .toSorted();
+        const expected = inputEntries(status);
+        return (
+          output.length === expected.length && output.every((entry, i) => entry === expected[i])
+        );
       })
     );
   });
 
-  it('file count in tree equals input file count', () => {
+  it('gives every node a distinct id', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
-        const tree = buildFileTree(status);
-        return countFiles(tree) === paths.length;
+      fc.property(gitStatusArb, (status) => {
+        const ids = collectAllNodes(buildFileTree(status)).map((n) => n.id);
+        return new Set(ids).size === ids.length;
       })
     );
   });
 
   it('directories are always sorted before files at same level', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, (status) => {
         const tree = buildFileTree(status);
         return checkSorting(tree);
       })
@@ -149,8 +114,7 @@ describe('buildFileTree properties', () => {
 
   it('nodes within same type are alphabetically sorted', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, (status) => {
         const tree = buildFileTree(status);
         return checkAlphabetical(tree);
       })
@@ -159,43 +123,42 @@ describe('buildFileTree properties', () => {
 });
 
 describe('flattenTree properties', () => {
-  it('flattened output contains all paths when nothing collapsed', () => {
+  it('flattened output contains every node when nothing collapsed', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, (status) => {
         const tree = buildFileTree(status);
-        const flat = flattenTree(tree, new Set());
-        const flatPaths = new Set(flat.map((n) => n.node.path));
+        const flatIds = flattenTree(tree, new Set()).map((n) => n.node.id);
+        const allIds = collectAllNodes(tree).map((n) => n.id);
 
-        return paths.every((p) => flatPaths.has(p));
+        return flatIds.length === allIds.length && allIds.every((id, i) => id === flatIds[i]);
       })
     );
   });
 
-  it('collapsed folders hide their descendants', () => {
+  it('collapsed folders hide their descendants and nothing else', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, fc.nat(), (paths, seed) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, fc.nat(), (status, seed) => {
         const tree = buildFileTree(status);
-        const allDirs = getAllDirectoryKeys(tree);
+        const allNodes = collectAllNodes(tree);
+        const dirs = allNodes.filter((n) => n.type === 'directory');
 
-        if (allDirs.size === 0) return true;
+        if (dirs.length === 0) return true;
 
-        const dirsArray = [...allDirs];
-        const collapsedDir = dirsArray[seed % dirsArray.length]!;
-        const collapsed = new Set([collapsedDir]);
-        const flat = flattenTree(tree, collapsed);
-        const flatKeys = flat.map((n) => n.key);
+        const collapsedDir = dirs[seed % dirs.length]!;
+        const isDescendant = (node: FileTreeNode) => node.path.startsWith(`${collapsedDir.path}/`);
+        const flatIds = flattenTree(tree, new Set([collapsedDir.id])).map((n) => n.node.id);
+        const expectedIds = allNodes.filter((n) => !isDescendant(n)).map((n) => n.id);
 
-        return !flatKeys.some((k) => k !== collapsedDir && k.startsWith(collapsedDir));
+        return (
+          flatIds.length === expectedIds.length && expectedIds.every((id, i) => id === flatIds[i])
+        );
       })
     );
   });
 
   it('depth increases by 1 for each nesting level', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, (status) => {
         const tree = buildFileTree(status);
         const flat = flattenTree(tree, new Set());
 
@@ -207,42 +170,25 @@ describe('flattenTree properties', () => {
     );
   });
 
-  it('parentPath correctly references parent directory', () => {
+  it('parentId references the containing directory', () => {
     fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
+      fc.property(gitStatusArb, (status) => {
         const tree = buildFileTree(status);
+        const byId = new Map(collectAllNodes(tree).map((n) => [n.id, n]));
         const flat = flattenTree(tree, new Set());
 
         return flat.every((item) => {
           const parts = item.node.path.split('/');
           if (parts.length === 1) {
-            return item.parentPath === null;
+            return item.parentId === null;
           }
-          const expectedParent = parts.slice(0, -1).join('/');
-          return item.parentPath === expectedParent;
+          const parent = item.parentId === null ? undefined : byId.get(item.parentId);
+          return (
+            parent?.type === 'directory' &&
+            parent.path === parts.slice(0, -1).join('/') &&
+            parent.children.includes(item.node)
+          );
         });
-      })
-    );
-  });
-});
-
-describe('getAllKeys properties', () => {
-  it('returns all file and directory keys', () => {
-    fc.assert(
-      fc.property(uniqueFilePathsArb, (paths) => {
-        const status = createGitStatus(paths);
-        const tree = buildFileTree(status);
-        const allKeys = getAllKeys(tree);
-
-        const filePaths = getAllFilePaths(tree);
-        const dirPaths = getAllDirectoryPaths(tree);
-
-        return (
-          filePaths.every((p) => allKeys.includes(p)) &&
-          [...dirPaths].every((p) => allKeys.includes(`${p}/`)) &&
-          new Set(allKeys).size === allKeys.length
-        );
       })
     );
   });

@@ -1,17 +1,19 @@
-import type { FileEntry, FileEntryKind, GitStatus } from '../../../tauri-bindings';
+import type { DiffTarget, FileEntry, FileEntryKind, GitStatus } from '../../../tauri-bindings';
 
 type FileStatus = FileEntryKind['status'];
 
 export interface FileNode {
   type: 'file';
+  id: string;
   name: string;
   path: string;
   kind: FileEntryKind;
-  isStaged: boolean;
+  target: DiffTarget;
 }
 
 export interface DirectoryNode {
   type: 'directory';
+  id: string;
   name: string;
   path: string;
   children: FileTreeNode[];
@@ -19,15 +21,15 @@ export interface DirectoryNode {
 
 export type FileTreeNode = FileNode | DirectoryNode;
 
-interface FileWithStaged extends FileEntry {
-  isStaged: boolean;
+interface TargetedFile extends FileEntry {
+  target: DiffTarget;
 }
 
 export function buildFileTree(status: GitStatus): FileTreeNode[] {
-  const files: FileWithStaged[] = [
-    ...status.staged.map((f) => ({ ...f, isStaged: true })),
-    ...status.unstaged.map((f) => ({ ...f, isStaged: false })),
-    ...status.untracked.map((f) => ({ ...f, isStaged: false }))
+  const files: TargetedFile[] = [
+    ...status.staged.map((f) => ({ ...f, target: 'staged' as const })),
+    ...status.unstaged.map((f) => ({ ...f, target: 'unstaged' as const })),
+    ...status.untracked.map((f) => ({ ...f, target: 'unstaged' as const }))
   ];
 
   const root = createDirectory('', '');
@@ -61,16 +63,17 @@ export function buildFileTree(status: GitStatus): FileTreeNode[] {
 }
 
 function createDirectory(name: string, path: string): DirectoryNode {
-  return { type: 'directory', name, path, children: [] };
+  return { type: 'directory', id: `dir:${path}`, name, path, children: [] };
 }
 
-function createFileNode(name: string, file: FileWithStaged): FileNode {
+function createFileNode(name: string, file: TargetedFile): FileNode {
   return {
     type: 'file',
+    id: `${file.target}:${file.path}`,
     name,
     path: file.path,
     kind: file.kind,
-    isStaged: file.isStaged
+    target: file.target
   };
 }
 

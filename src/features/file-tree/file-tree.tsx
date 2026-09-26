@@ -22,7 +22,6 @@ import { sidebarMenuButtonVariants } from '#features/components/ui/sidebar-menu-
 
 import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 import { buildFileTree, getStatusLabel, type FileTreeNode } from './tree-builder';
-import { nodeKey } from './tree-utils';
 import { useFileTreeKeyboard } from './use-file-tree-keyboard';
 
 interface FileTreeProps {
@@ -35,7 +34,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const tree = buildFileTree(status);
   const containerRef = useRef<HTMLUListElement>(null);
 
-  const { focusedKey, setFocusedKey, expandedKeys, toggleExpanded, handleKeyDown } =
+  const { focusedId, setFocusedId, collapsedIds, toggleExpanded, handleKeyDown } =
     useFileTreeKeyboard({
       tree,
       onSelectFile
@@ -44,9 +43,9 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const treeItemProps = {
     selectedFile,
     onSelectFile,
-    focusedKey,
-    setFocusedKey,
-    expandedKeys,
+    focusedId,
+    setFocusedId,
+    collapsedIds,
     toggleExpanded
   };
 
@@ -66,7 +65,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
       className="outline-none"
     >
       {tree.map((node) => (
-        <TreeItem key={nodeKey(node)} node={node} {...treeItemProps} />
+        <TreeItem key={node.id} node={node} {...treeItemProps} />
       ))}
     </SidebarMenu>
   );
@@ -76,44 +75,23 @@ interface TreeItemProps {
   node: FileTreeNode;
   selectedFile: string | null;
   onSelectFile: (path: string, target: DiffTarget) => void;
-  focusedKey: string | null;
-  setFocusedKey: (key: string | null) => void;
-  expandedKeys: Set<string>;
-  toggleExpanded: (key: string) => void;
+  focusedId: string | null;
+  setFocusedId: (id: string | null) => void;
+  collapsedIds: ReadonlySet<string>;
+  toggleExpanded: (id: string) => void;
 }
 
-type TreeItemSharedProps = Omit<TreeItemProps, 'node'>;
-
-function TreeItem({
-  node,
-  selectedFile,
-  onSelectFile,
-  focusedKey,
-  setFocusedKey,
-  expandedKeys,
-  toggleExpanded
-}: TreeItemProps) {
-  const key = nodeKey(node);
-  const isFocused = focusedKey === key;
-  const focus = () => {
-    setFocusedKey(key);
-  };
-
-  const handleClick = () => {
-    focus();
-    if (node.type === 'file') {
-      const target: DiffTarget = node.isStaged ? 'staged' : 'unstaged';
-      onSelectFile(node.path, target);
-    }
-  };
-
-  const handleToggle = () => {
-    focus();
-    toggleExpanded(key);
-  };
+function TreeItem({ node, ...shared }: TreeItemProps) {
+  const { selectedFile, onSelectFile, focusedId, setFocusedId, collapsedIds, toggleExpanded } =
+    shared;
+  const isFocused = focusedId === node.id;
 
   if (node.type === 'file') {
     const isSelected = selectedFile === node.path;
+    const handleClick = () => {
+      setFocusedId(node.id);
+      onSelectFile(node.path, node.target);
+    };
 
     return (
       <SidebarMenuItem>
@@ -121,7 +99,7 @@ function TreeItem({
           isActive={isSelected}
           onClick={handleClick}
           data-focused={isFocused && !isSelected}
-          className={`group/file transition-all duration-150 ${node.isStaged ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
+          className={`group/file transition-all duration-150 ${node.target === 'staged' ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
           tabIndex={-1}
         >
           <HugeiconsIcon
@@ -143,14 +121,10 @@ function TreeItem({
     );
   }
 
-  const expanded = expandedKeys.has(key);
-  const childTreeItemProps: TreeItemSharedProps = {
-    selectedFile,
-    onSelectFile,
-    focusedKey,
-    setFocusedKey,
-    expandedKeys,
-    toggleExpanded
+  const expanded = !collapsedIds.has(node.id);
+  const handleToggle = () => {
+    setFocusedId(node.id);
+    toggleExpanded(node.id);
   };
 
   return (
@@ -180,7 +154,7 @@ function TreeItem({
         <CollapsibleContent>
           <SidebarMenuSub className="pl-5">
             {node.children.map((child) => (
-              <TreeItem key={nodeKey(child)} node={child} {...childTreeItemProps} />
+              <TreeItem key={child.id} node={child} {...shared} />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>
