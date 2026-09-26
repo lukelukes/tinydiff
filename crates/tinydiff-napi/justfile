@@ -2,7 +2,9 @@ set quiet
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 pkg := "tinydiff-napi"
+dts := "crates/tinydiff-napi/index.d.ts"
 dts_header := "import type { AppMode, Comment, CommandError, CommentCollection, DiffTarget, FileDiff, GitFileContents, GitStatus, ReadFileResult, Result } from '../../src/bindings/types';"
+napi_build := "bunx napi build --release --manifest-path crates/tinydiff-napi/Cargo.toml --dts-header \"" + dts_header + "\" --output-dir"
 
 [group('check')]
 fmt:
@@ -18,19 +20,28 @@ clippy:
 
 [group('check')]
 [parallel]
-check: fmt-check clippy types-check
+check: fmt-check clippy bindings-check
 
 [group('build')]
 [no-cd]
-build:
-    bunx napi build --release --manifest-path crates/tinydiff-napi/Cargo.toml --output-dir crates/tinydiff-napi --dts-header "{{ dts_header }}"
+build: types
+    {{ napi_build }} crates/tinydiff-napi
 
 [group('build')]
 [no-cd]
 types:
-    cargo run -p tinydiff-core --example export-types --features specta
+    cargo run -q -p tinydiff-core --example export-types --features specta
 
 [group('check')]
 [no-cd]
+bindings-check: types-check dts-check
+
+[private]
+[no-cd]
 types-check:
-    cargo run -p tinydiff-core --example export-types --features specta -- --check
+    cargo run -q -p tinydiff-core --example export-types --features specta -- --check
+
+[private]
+[no-cd]
+dts-check:
+    out="$(mktemp -d)"; trap 'rm -rf "$out"' EXIT; {{ napi_build }} "$out"; diff -u {{ dts }} "$out/index.d.ts" || { echo "{{ dts }} is stale, run \`just napi::build\`" >&2; exit 1; }

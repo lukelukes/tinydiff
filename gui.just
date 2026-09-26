@@ -11,7 +11,7 @@ dev *args: addon
     bun electron-vite dev -w --sourcemap -- {{ args }}
 
 [group('dev')]
-build: addon
+build:
     bun run electron:build
 
 [group('dev')]

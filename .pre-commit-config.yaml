@@ -27,11 +27,11 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
-      - id: bindings-types
+      - id: bindings
         name: generated bindings are current
-        entry: just napi::types-check
+        entry: just napi::bindings-check
         language: system
-        files: ^(crates/tinydiff-core/|src/bindings/types\.ts$)
+        files: ^(crates/tinydiff-(core|napi)/|src/bindings/types\.ts$|Cargo\.lock$|package\.json$|bun\.lock$)
         pass_filenames: false
         stages: [pre-commit]
 
