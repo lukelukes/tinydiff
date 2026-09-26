@@ -2,14 +2,8 @@ import { join } from 'node:path';
 
 import { app, BrowserWindow, session, shell } from 'electron';
 
-import { DEV_CSP_NONCE_ENV, RENDERER_ORIGIN } from './csp';
-import { externalUrl } from './external-url';
-import { applyDevCsp, serveRenderer } from './protocol';
-import { devRendererUrl } from './renderer-url';
-
-let mainWindow: BrowserWindow | null = null;
-let rendererReloaded = false;
-let devOrigin: string | null = null;
+import { applyDevCsp, registerAppScheme, RENDERER_URL, serveRenderer } from './protocol';
+import { devRenderer, httpUrl, withinRenderer } from './urls';
 
 function log(message: string): void {
   process.stderr.write(`[tinydiff] ${message}\n`);
@@ -19,14 +13,12 @@ function formatError(error: unknown): string {
   return error instanceof Error ? (error.stack ?? error.message) : String(error);
 }
 
-function isAllowedNavigation(url: string): boolean {
-  if (url.startsWith(`${RENDERER_ORIGIN}/`)) {
-    return true;
-  }
-  return devOrigin !== null && URL.parse(url)?.origin === devOrigin;
+function fail(context: string, error: unknown): void {
+  log(`${context}: ${formatError(error)}`);
+  app.exit(1);
 }
 
-function createWindow(): BrowserWindow {
+function createWindow(rendererUrl: string): BrowserWindow {
   const win = new BrowserWindow({
     width: 1024,
     height: 768,
@@ -34,53 +26,67 @@ function createWindow(): BrowserWindow {
     title: 'TinyDiff',
     backgroundColor: '#18181b',
     webPreferences: {
-      preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
     }
   });
+  let reloaded = false;
 
   win.once('ready-to-show', () => {
     win.show();
   });
 
   win.webContents.on('will-navigate', (event) => {
-    if (!isAllowedNavigation(event.url)) {
+    if (!withinRenderer(rendererUrl, event.url)) {
       event.preventDefault();
     }
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    const external = externalUrl(url);
+    const external = httpUrl(url);
     if (external !== null) {
-      shell.openExternal(external).catch((error: unknown) => {
-        log(`failed to open ${external}: ${formatError(error)}`);
+      shell.openExternal(external.href).catch((error: unknown) => {
+        log(`failed to open ${external.href}: ${formatError(error)}`);
       });
     }
     return { action: 'deny' };
   });
 
-  win.on('closed', () => {
-    mainWindow = null;
+  win.webContents.on('render-process-gone', (_event, details) => {
+    log(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`);
+    if (details.reason === 'clean-exit' || details.reason === 'killed' || reloaded) {
+      return;
+    }
+    reloaded = true;
+    win.webContents.reload();
   });
 
   return win;
 }
 
 function focusMainWindow(): void {
-  if (mainWindow === null) {
+  const [win] = BrowserWindow.getAllWindows();
+  if (win === undefined) {
     return;
   }
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
+  if (win.isMinimized()) {
+    win.restore();
   }
-  mainWindow.focus();
+  win.focus();
+}
+
+function installRenderer(): string {
+  const dev = devRenderer(process.env, app.isPackaged);
+  if (dev === null) {
+    serveRenderer(join(import.meta.dirname, '../renderer'));
+    return RENDERER_URL;
+  }
+  applyDevCsp(dev.nonce);
+  return dev.url;
 }
 
 async function start(): Promise<void> {
-  const rendererUrl = devRendererUrl(process.env.ELECTRON_RENDERER_URL, app.isPackaged);
-  devOrigin = rendererUrl ? new URL(rendererUrl).origin : null;
   await app.whenReady();
 
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
@@ -88,30 +94,16 @@ async function start(): Promise<void> {
   });
   session.defaultSession.setPermissionCheckHandler(() => false);
 
-  if (rendererUrl) {
-    applyDevCsp(process.env[DEV_CSP_NONCE_ENV]);
-  } else {
-    serveRenderer(join(import.meta.dirname, '../renderer'));
-  }
-
-  const win = createWindow();
-  mainWindow = win;
-  await win.loadURL(rendererUrl ?? `${RENDERER_ORIGIN}/`);
+  const rendererUrl = installRenderer();
+  await createWindow(rendererUrl).loadURL(rendererUrl);
 }
 
 function bootstrap(): void {
+  registerAppScheme();
+
   app.on('second-instance', (_event, argv, workingDirectory) => {
     log(`second instance launched in ${workingDirectory} with ${JSON.stringify(argv)}`);
     focusMainWindow();
-  });
-
-  app.on('render-process-gone', (_event, contents, details) => {
-    log(`renderer process gone: ${details.reason} (exit code ${details.exitCode})`);
-    if (details.reason === 'clean-exit' || details.reason === 'killed' || rendererReloaded) {
-      return;
-    }
-    rendererReloaded = true;
-    contents.reload();
   });
 
   app.on('child-process-gone', (_event, details) => {
@@ -121,7 +113,7 @@ function bootstrap(): void {
   });
 
   process.on('uncaughtException', (error) => {
-    log(`uncaught exception: ${error.stack ?? error.message}`);
+    fail('uncaught exception', error);
   });
 
   app.on('window-all-closed', () => {
@@ -129,8 +121,7 @@ function bootstrap(): void {
   });
 
   start().catch((error: unknown) => {
-    log(`startup failed: ${formatError(error)}`);
-    app.exit(1);
+    fail('startup failed', error);
   });
 }
 

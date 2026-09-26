@@ -8,7 +8,7 @@ dev *args:
 
 [group('dev')]
 build:
-    bun electron-vite build
+    bun run electron:build
 
 [group('dev')]
 [no-exit-message]

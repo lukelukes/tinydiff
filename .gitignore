@@ -9,5 +9,4 @@ tsconfig.node.tsbuildinfo
 .opencode/
 out/
 release/
-crates/tinydiff-napi/*.node
 **/__screenshots__/

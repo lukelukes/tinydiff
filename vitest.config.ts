@@ -1,12 +1,11 @@
 import { playwright } from '@vitest/browser-playwright';
-import type { ViteUserConfig } from 'vitest/config';
 import { defineConfig } from 'vitest/config';
 
-import { rendererTestPlugins } from './vite.renderer';
+import { renderer } from './vite.renderer';
 
 const headed = process.env.HEADED === 'true';
 
-export default defineConfig(async (): Promise<ViteUserConfig> => ({
+export default defineConfig({
   test: {
     projects: [
       {
@@ -29,7 +28,7 @@ export default defineConfig(async (): Promise<ViteUserConfig> => ({
         }
       },
       {
-        plugins: await rendererTestPlugins(),
+        plugins: renderer.plugins,
         test: {
           name: 'browser',
           browser: {
@@ -44,4 +43,4 @@ export default defineConfig(async (): Promise<ViteUserConfig> => ({
       }
     ]
   }
-}));
+});

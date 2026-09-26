@@ -5,20 +5,27 @@ import { net, protocol, session } from 'electron';
 
 import { CSP, devCsp } from './csp';
 
-protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }
-]);
+const SCHEME = 'app';
+const HOST = 'renderer';
+
+export const RENDERER_URL = `${SCHEME}://${HOST}/`;
 
 function notFound(): Response {
   return new Response(null, { status: 404 });
 }
 
+export function registerAppScheme(): void {
+  protocol.registerSchemesAsPrivileged([
+    { scheme: SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } }
+  ]);
+}
+
 export function serveRenderer(root: string): void {
-  protocol.handle('app', async (request) => {
+  protocol.handle(SCHEME, async (request) => {
     const { host, pathname } = new URL(request.url);
     const target = resolve(root, pathname === '/' ? 'index.html' : `.${pathname}`);
     const rel = relative(root, target);
-    if (host !== 'renderer' || rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+    if (host !== HOST || rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
       return notFound();
     }
     try {
@@ -32,7 +39,7 @@ export function serveRenderer(root: string): void {
   });
 }
 
-export function applyDevCsp(nonce: string | undefined): void {
+export function applyDevCsp(nonce: string): void {
   const policy = devCsp(nonce);
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     callback({
