@@ -3,7 +3,7 @@ use std::path::Path;
 
 use specta::TypeCollection;
 use specta_typescript::{BigIntExportBehavior, Typescript};
-use tinydiff_core::app::{AppMode, CommandError};
+use tinydiff_core::commands::{AppMode, CommandError};
 use tinydiff_core::types::{
     Comment, CommentAnchor, CommentCollection, DiffContent, DiffFile, DiffHunk, DiffLine,
     DiffTarget, FileContent, FileDiff, FileEntry, FileEntryKind, GitFileContents, GitStatus,
@@ -42,7 +42,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output = format!("{RESULT_TYPE}\n\n{}\n", body.trim());
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../src/bindings/types.ts");
-    fs::create_dir_all(path.parent().ok_or("types.ts has no parent directory")?)?;
+    if std::env::args().any(|arg| arg == "--check") {
+        if fs::read_to_string(&path)? != output {
+            return Err(format!("{} is stale, run `just napi::types`", path.display()).into());
+        }
+        return Ok(());
+    }
     fs::write(&path, output)?;
     println!("wrote {}", path.display());
     Ok(())

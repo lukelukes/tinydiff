@@ -12,7 +12,7 @@ export declare function getGitStatus(path: string): Promise<Result<GitStatus, Co
 
 export declare function loadComments(repoPath: string): Promise<Result<CommentCollection, CommandError>>
 
-export declare function readFile(filePath: string, allowed: Array<string>): Promise<Result<ReadFileResult, CommandError>>
+export declare function readFile(mode: AppMode, filePath: string): Promise<Result<ReadFileResult, CommandError>>
 
 export declare function resolveAppMode(paths: Array<string>): Result<AppMode, CommandError>
 

@@ -17,12 +17,8 @@ clippy:
     cargo clippy -p {{ pkg }} -- -D warnings
 
 [group('check')]
-test:
-    cargo test -p {{ pkg }}
-
-[group('check')]
 [parallel]
-check: fmt clippy test
+check: fmt-check clippy types-check
 
 [group('build')]
 [no-cd]
@@ -34,7 +30,7 @@ build:
 types:
     cargo run -p tinydiff-core --example export-types --features specta
 
-[group('build')]
+[group('check')]
 [no-cd]
-types-check: types
-    git diff --exit-code src/bindings/types.ts
+types-check:
+    cargo run -p tinydiff-core --example export-types --features specta -- --check

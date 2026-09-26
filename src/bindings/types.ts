@@ -2,7 +2,7 @@ export type Result<T, E> = { status: "ok"; data: T } | { status: "error"; error:
 
 export type AppMode = { type: "empty" } | { type: "git"; path: string } | { type: "file"; fileA: string; fileB: string }
 
-export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; path: string; message: string }
+export type CommandError = { type: "path"; path: string; message: string } | { type: "utf8"; path: string } | { type: "git"; message: string } | { type: "invalid"; message: string }
 
 export type Comment = { id: string; filePath: string; anchor: CommentAnchor; body: string; resolved: boolean; createdAt: number; updatedAt: number }
 

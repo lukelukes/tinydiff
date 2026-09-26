@@ -27,6 +27,14 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: bindings-types
+        name: generated bindings are current
+        entry: just napi::types-check
+        language: system
+        files: ^(crates/tinydiff-core/|src/bindings/types\.ts$)
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: oxfmt
         name: oxfmt check
         entry: bun run fmt:check
