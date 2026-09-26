@@ -9,6 +9,10 @@ import type { ElectronApplication, Page } from 'playwright';
 import { _electron as electron } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+declare global {
+  var openedExternally: string[] | undefined;
+}
+
 const FILE_NAME = 'greeter.ts';
 
 const ORIGINAL = `export function greet(name: string): string {
@@ -23,6 +27,9 @@ const MODIFIED = `export function greet(name: string, excited = false): string {
 `;
 
 const COMMENT_BODY = 'Consider defaulting excited to true';
+
+const EXTERNAL_URL = 'http://open-external.invalid/';
+const REJECTED_URLS = ['file:///etc/passwd', 'javascript:alert(1)'];
 
 const RESTORED_BOUNDS = { x: 40, y: 50, width: 900, height: 640 };
 const STATE_SAVE_SETTLE_MS = 1000;
@@ -60,6 +67,32 @@ function launch(repoDir: string, userDataDir: string): Promise<ElectronApplicati
     chromiumSandbox: true,
     env: definedEnv()
   });
+}
+
+function stubOpenExternal(target: ElectronApplication): Promise<void> {
+  return target.evaluate(({ shell }) => {
+    globalThis.openedExternally = [];
+    shell.openExternal = (url) => {
+      globalThis.openedExternally?.push(url);
+      return Promise.resolve();
+    };
+  });
+}
+
+function openedExternally(target: ElectronApplication): Promise<string[]> {
+  return target.evaluate(() => globalThis.openedExternally ?? []);
+}
+
+function clickBlankAnchor(target: Page, href: string): Promise<void> {
+  return target.evaluate((url) => {
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.target = '_blank';
+    anchor.rel = 'noopener';
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+  }, href);
 }
 
 async function withApp<T>(
@@ -101,6 +134,7 @@ describe('tinydiff electron app', () => {
     repoDir = createRepo();
     userDataDir = mkdtempSync(join(tmpdir(), 'tinydiff-e2e-user-data-'));
     app = await launch(repoDir, userDataDir);
+    await stubOpenExternal(app);
     page = await app.firstWindow();
   });
 
@@ -129,6 +163,22 @@ describe('tinydiff electron app', () => {
     await expect(
       app.evaluate(({ app: electronApp }) => electronApp.commandLine.hasSwitch('no-sandbox'))
     ).resolves.toBe(false);
+  });
+
+  it('opens http links from the renderer through the shell without navigating', async () => {
+    const url = page.url();
+    await clickBlankAnchor(page, EXTERNAL_URL);
+    await page.evaluate((target) => window.open(target, '_blank'), EXTERNAL_URL);
+    await expect.poll(() => openedExternally(app)).toStrictEqual([EXTERNAL_URL, EXTERNAL_URL]);
+    expect(page.url()).toBe(url);
+    expect(app.windows()).toHaveLength(1);
+  });
+
+  it('refuses to open non-http links externally', async () => {
+    const before = await openedExternally(app);
+    await Promise.all(REJECTED_URLS.map((rejected) => clickBlankAnchor(page, rejected)));
+    await expect(openedExternally(app)).resolves.toStrictEqual(before);
+    expect(app.windows()).toHaveLength(1);
   });
 
   it('lists the modified file in the file tree', async () => {
