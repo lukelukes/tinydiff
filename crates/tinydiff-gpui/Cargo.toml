@@ -13,5 +13,4 @@ name = "tinydiff-gpui"
 path = "src/main.rs"
 
 [dependencies]
-tinydiff-core = { path = "../tinydiff-core" }
 gpui = "0.2.2"
