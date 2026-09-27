@@ -34,7 +34,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const tree = buildFileTree(status);
   const containerRef = useRef<HTMLUListElement>(null);
 
-  const { focusedPath, setFocusedPath, expandedPaths, toggleExpanded, handleKeyDown } =
+  const { focusedId, setFocusedId, collapsedIds, toggleExpanded, handleKeyDown } =
     useFileTreeKeyboard({
       tree,
       onSelectFile
@@ -43,9 +43,9 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
   const treeItemProps = {
     selectedFile,
     onSelectFile,
-    focusedPath,
-    setFocusedPath,
-    expandedPaths,
+    focusedId,
+    setFocusedId,
+    collapsedIds,
     toggleExpanded
   };
 
@@ -65,7 +65,7 @@ export function FileTree({ status, selectedFile, onSelectFile }: FileTreeProps) 
       className="outline-none"
     >
       {tree.map((node) => (
-        <TreeItem key={node.path} node={node} {...treeItemProps} />
+        <TreeItem key={node.id} node={node} {...treeItemProps} />
       ))}
     </SidebarMenu>
   );
@@ -75,43 +75,23 @@ interface TreeItemProps {
   node: FileTreeNode;
   selectedFile: string | null;
   onSelectFile: (path: string, target: DiffTarget) => void;
-  focusedPath: string | null;
-  setFocusedPath: (path: string | null) => void;
-  expandedPaths: Set<string>;
-  toggleExpanded: (path: string) => void;
+  focusedId: string | null;
+  setFocusedId: (id: string | null) => void;
+  collapsedIds: ReadonlySet<string>;
+  toggleExpanded: (id: string) => void;
 }
 
-type TreeItemSharedProps = Omit<TreeItemProps, 'node'>;
-
-function TreeItem({
-  node,
-  selectedFile,
-  onSelectFile,
-  focusedPath,
-  setFocusedPath,
-  expandedPaths,
-  toggleExpanded
-}: TreeItemProps) {
-  const isFocused = focusedPath === node.path;
-  const focus = () => {
-    setFocusedPath(node.path);
-  };
-
-  const handleClick = () => {
-    focus();
-    if (node.type === 'file') {
-      const target: DiffTarget = node.isStaged ? 'staged' : 'unstaged';
-      onSelectFile(node.path, target);
-    }
-  };
-
-  const handleToggle = () => {
-    focus();
-    toggleExpanded(node.path);
-  };
+function TreeItem({ node, ...shared }: TreeItemProps) {
+  const { selectedFile, onSelectFile, focusedId, setFocusedId, collapsedIds, toggleExpanded } =
+    shared;
+  const isFocused = focusedId === node.id;
 
   if (node.type === 'file') {
     const isSelected = selectedFile === node.path;
+    const handleClick = () => {
+      setFocusedId(node.id);
+      onSelectFile(node.path, node.target);
+    };
 
     return (
       <SidebarMenuItem>
@@ -119,7 +99,7 @@ function TreeItem({
           isActive={isSelected}
           onClick={handleClick}
           data-focused={isFocused && !isSelected}
-          className={`group/file transition-all duration-150 ${node.isStaged ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
+          className={`group/file transition-all duration-150 ${node.target === 'staged' ? 'opacity-100' : 'opacity-80 hover:opacity-100'}`}
           tabIndex={-1}
         >
           <HugeiconsIcon
@@ -141,14 +121,10 @@ function TreeItem({
     );
   }
 
-  const expanded = expandedPaths.has(node.path);
-  const childTreeItemProps: TreeItemSharedProps = {
-    selectedFile,
-    onSelectFile,
-    focusedPath,
-    setFocusedPath,
-    expandedPaths,
-    toggleExpanded
+  const expanded = !collapsedIds.has(node.id);
+  const handleToggle = () => {
+    setFocusedId(node.id);
+    toggleExpanded(node.id);
   };
 
   return (
@@ -178,7 +154,7 @@ function TreeItem({
         <CollapsibleContent>
           <SidebarMenuSub className="pl-5">
             {node.children.map((child) => (
-              <TreeItem key={child.path} node={child} {...childTreeItemProps} />
+              <TreeItem key={child.id} node={child} {...shared} />
             ))}
           </SidebarMenuSub>
         </CollapsibleContent>

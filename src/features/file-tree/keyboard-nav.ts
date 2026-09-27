@@ -4,56 +4,51 @@ import { flattenTree } from './tree-utils';
 export type NavigationKey = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End';
 
 export interface NavigationState {
-  focusedPath: string | null;
-  collapsedPaths: Set<string>;
-}
-
-export interface NavigationResult {
-  focusedPath: string | null;
-  collapsedPaths: Set<string>;
+  focusedId: string | null;
+  collapsedIds: ReadonlySet<string>;
 }
 
 export function applyKeyboardNav(
   tree: FileTreeNode[],
   state: NavigationState,
   key: NavigationKey
-): NavigationResult {
-  const { focusedPath, collapsedPaths } = state;
-  const flatNodes = flattenTree(tree, collapsedPaths);
+): NavigationState {
+  const { focusedId, collapsedIds } = state;
+  const flatNodes = flattenTree(tree, collapsedIds);
 
   if (flatNodes.length === 0) {
     return state;
   }
 
   const currentIndex =
-    focusedPath === null ? -1 : flatNodes.findIndex((f) => f.node.path === focusedPath);
+    focusedId === null ? -1 : flatNodes.findIndex((f) => f.node.id === focusedId);
   const currentFlat = currentIndex >= 0 ? flatNodes[currentIndex] : null;
   const move = (step: number) => {
     const nextIndex = (currentIndex + step + flatNodes.length) % flatNodes.length;
-    return flatNodes[nextIndex]?.node.path ?? focusedPath;
+    return flatNodes[nextIndex]?.node.id ?? focusedId;
   };
 
   switch (key) {
     case 'ArrowDown':
-      return { focusedPath: move(1), collapsedPaths };
+      return { focusedId: move(1), collapsedIds };
     case 'ArrowUp':
-      return { focusedPath: move(-1), collapsedPaths };
+      return { focusedId: move(-1), collapsedIds };
     case 'Home':
-      return { focusedPath: flatNodes[0]?.node.path ?? focusedPath, collapsedPaths };
+      return { focusedId: flatNodes[0]?.node.id ?? focusedId, collapsedIds };
     case 'End':
-      return { focusedPath: flatNodes.at(-1)?.node.path ?? focusedPath, collapsedPaths };
+      return { focusedId: flatNodes.at(-1)?.node.id ?? focusedId, collapsedIds };
 
     case 'ArrowRight': {
       if (!currentFlat || currentFlat.node.type !== 'directory') {
         return state;
       }
 
-      if (collapsedPaths.has(currentFlat.node.path)) {
-        const newCollapsed = new Set(collapsedPaths);
-        newCollapsed.delete(currentFlat.node.path);
-        return { focusedPath, collapsedPaths: newCollapsed };
+      if (collapsedIds.has(currentFlat.node.id)) {
+        const newCollapsed = new Set(collapsedIds);
+        newCollapsed.delete(currentFlat.node.id);
+        return { focusedId, collapsedIds: newCollapsed };
       }
-      return { focusedPath: currentFlat.node.children[0]?.path ?? focusedPath, collapsedPaths };
+      return { focusedId: currentFlat.node.children[0]?.id ?? focusedId, collapsedIds };
     }
 
     case 'ArrowLeft': {
@@ -61,10 +56,10 @@ export function applyKeyboardNav(
         return state;
       }
 
-      if (currentFlat.node.type === 'directory' && !collapsedPaths.has(currentFlat.node.path)) {
-        return { focusedPath, collapsedPaths: new Set([...collapsedPaths, currentFlat.node.path]) };
+      if (currentFlat.node.type === 'directory' && !collapsedIds.has(currentFlat.node.id)) {
+        return { focusedId, collapsedIds: new Set([...collapsedIds, currentFlat.node.id]) };
       }
-      return { focusedPath: currentFlat.parentPath ?? focusedPath, collapsedPaths };
+      return { focusedId: currentFlat.parentId ?? focusedId, collapsedIds };
     }
   }
 }
