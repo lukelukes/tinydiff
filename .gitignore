@@ -7,3 +7,6 @@ tsconfig.node.tsbuildinfo
 .idea/
 .claude/
 .opencode/
+out/
+release/
+**/__screenshots__/

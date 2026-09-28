@@ -6,7 +6,7 @@
     "perf": "error",
     "suspicious": "error"
   },
-  "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "src/vite-env.d.ts", "*.config.*"],
+  "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "src/vite-env.d.ts"],
   "plugins": [
     "oxc",
     "typescript",

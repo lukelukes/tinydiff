@@ -1,9 +1,8 @@
-import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
 import type { HtmlTagDescriptor, Plugin } from 'vite';
 import { defineConfig } from 'vite';
 
-const host = process.env.TAURI_DEV_HOST;
+import { renderer } from './vite.renderer';
+
 const profilingEnabled = !!process.env.PROFILING_ENABLED;
 const isBrowserDev = !process.env.TAURI_ENV_PLATFORM;
 
@@ -42,24 +41,11 @@ function devScripts(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [
-    react({
-      babel: {
-        plugins: ['babel-plugin-react-compiler']
-      }
-    }),
-    tailwindcss(),
-    devScripts()
-  ],
-  clearScreen: false,
-  worker: {
-    format: 'es'
-  },
+  ...renderer,
+  plugins: [...renderer.plugins, devScripts()],
   server: {
     port: 1420,
     strictPort: true,
-    host: host || false,
-    hmr: host ? { protocol: 'ws', host, port: 1421 } : undefined,
-    watch: { ignored: ['**/src-tauri/**'] }
+    watch: { ignored: ['**/crates/**', '**/out/**', '**/target/**'] }
   }
 });

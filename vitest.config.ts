@@ -1,6 +1,7 @@
-import react from '@vitejs/plugin-react';
-import { webdriverio } from '@vitest/browser-webdriverio';
+import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
+
+import { renderer } from './vite.renderer';
 
 const headed = process.env.HEADED === 'true';
 
@@ -9,7 +10,7 @@ export default defineConfig({
     projects: [
       {
         test: {
-          include: ['src/**/*.{test,spec}.ts'],
+          include: ['src/**/*.{test,spec}.ts', 'electron/**/*.{test,spec}.ts'],
           exclude: ['src/**/*.property.spec.ts'],
           name: 'unit',
           environment: 'node',
@@ -27,14 +28,14 @@ export default defineConfig({
         }
       },
       {
-        plugins: [react()],
+        plugins: renderer.plugins,
         test: {
           name: 'browser',
           browser: {
-            provider: webdriverio(),
+            provider: playwright(),
             enabled: true,
             headless: !headed,
-            instances: [{ browser: 'chrome' }]
+            instances: [{ browser: 'chromium' }]
           },
           environment: 'node',
           include: ['src/**/*.browser.{test,spec}.{ts,tsx}']
