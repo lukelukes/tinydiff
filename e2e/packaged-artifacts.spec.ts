@@ -5,11 +5,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
   artifacts,
-  CONFIGURED_FUSES,
   declaredLibcMinimum,
   EXECUTABLE,
   extractAppImage,
   extractDeb,
+  type FuseName,
   GLIBC_BASELINE,
   glibcAbove,
   INSTALL_DIR,
@@ -17,6 +17,17 @@ import {
   shippedFuses,
   tempDir
 } from './artifacts';
+
+const REQUIRED_FUSES: Record<FuseName, boolean> = {
+  RunAsNode: false,
+  EnableCookieEncryption: true,
+  EnableNodeOptionsEnvironmentVariable: false,
+  EnableNodeCliInspectArguments: false,
+  EnableEmbeddedAsarIntegrityValidation: false,
+  OnlyLoadAppFromAsar: true,
+  LoadBrowserProcessSpecificV8Snapshot: false,
+  GrantFileProtocolExtraPrivileges: false
+};
 
 interface KernelPolicy {
   kernel: string;
@@ -102,8 +113,8 @@ describe('packaged artifacts', () => {
       expect(glibcAbove(root, GLIBC_BASELINE)).toStrictEqual([]);
     });
 
-    it('ships the fuses the build configures', async () => {
-      await expect(shippedFuses(join(root, EXECUTABLE))).resolves.toStrictEqual(CONFIGURED_FUSES);
+    it('ships the required fuse states', async () => {
+      await expect(shippedFuses(join(root, EXECUTABLE))).resolves.toStrictEqual(REQUIRED_FUSES);
     });
   });
 
@@ -132,9 +143,9 @@ describe('packaged artifacts', () => {
       expect(existsSync(join(root, INSTALL_DIR, 'AppRun'))).toBe(false);
     });
 
-    it('ships the fuses the build configures', async () => {
+    it('ships the required fuse states', async () => {
       await expect(shippedFuses(join(root, INSTALL_DIR, EXECUTABLE))).resolves.toStrictEqual(
-        CONFIGURED_FUSES
+        REQUIRED_FUSES
       );
     });
 

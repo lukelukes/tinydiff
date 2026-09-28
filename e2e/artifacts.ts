@@ -27,8 +27,6 @@ const ARCH_NAMES = {
 
 const GLIBC_SYMBOL = /GLIBC_(?<version>\d+(?:\.\d+)+)/gu;
 
-export const CONFIGURED_FUSES: Record<string, boolean> = builder.electronFuses;
-
 interface Artifacts {
   appImage: string;
   deb: string;
@@ -142,26 +140,24 @@ export function declaredLibcMinimum(control: string): string {
   return minimum;
 }
 
-const FUSE_OPTIONS = new Map(
-  Object.entries(FuseV1Options)
-    .filter((entry): entry is [string, FuseV1Options] => typeof entry[1] === 'number')
-    .map(([name, option]) => [`${name.charAt(0).toLowerCase()}${name.slice(1)}`, option])
+export type FuseName = keyof typeof FuseV1Options;
+
+const FUSE_NAMES = Object.keys(FuseV1Options).filter((key): key is FuseName =>
+  Number.isNaN(Number(key))
 );
 
-function fuseOption(key: string): FuseV1Options {
-  const option = FUSE_OPTIONS.get(key);
-  if (option === undefined) {
-    throw new Error(`${key} is not an Electron fuse`);
+function fuseState(code: number | undefined): boolean | string {
+  const state = code === undefined ? undefined : String.fromCodePoint(code);
+  if (state === '1') {
+    return true;
   }
-  return option;
+  if (state === '0') {
+    return false;
+  }
+  return `neither enabled nor disabled (${String(code)})`;
 }
 
-export async function shippedFuses(binary: string): Promise<Record<string, boolean>> {
+export async function shippedFuses(binary: string): Promise<Record<string, boolean | string>> {
   const wire = await getCurrentFuseWire(binary);
-  return Object.fromEntries(
-    Object.keys(CONFIGURED_FUSES).map((key) => [
-      key,
-      String.fromCodePoint(wire[fuseOption(key)] ?? 0) === '1'
-    ])
-  );
+  return Object.fromEntries(FUSE_NAMES.map((name) => [name, fuseState(wire[FuseV1Options[name]])]));
 }
