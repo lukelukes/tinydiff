@@ -1,4 +1,4 @@
-import { ipcMain, nativeTheme } from 'electron';
+import { nativeTheme } from 'electron';
 
 import type { NativeAddon, TinydiffApi } from '../../src/bindings/api';
 import type { AppMode } from '../../src/bindings/types';
@@ -34,9 +34,21 @@ export function createHandlers(
   };
 }
 
-export function registerIpc(handlers: TinydiffApi, rendererUrl: string): void {
+interface InvokeEvent {
+  senderFrame: { url: string } | null;
+}
+
+export interface InvokeRegistrar {
+  handle: (channel: string, listener: (event: InvokeEvent, ...args: unknown[]) => unknown) => void;
+}
+
+export function registerIpc(
+  ipc: InvokeRegistrar,
+  handlers: Readonly<Record<string, (...args: never[]) => unknown>>,
+  rendererUrl: string
+): void {
   for (const [method, handler] of Object.entries(handlers)) {
-    ipcMain.handle(channel(method), (event, ...args: unknown[]): unknown => {
+    ipc.handle(channel(method), (event, ...args: unknown[]): unknown => {
       if (!withinRenderer(rendererUrl, event.senderFrame?.url ?? '')) {
         throw new Error(`${channel(method)} rejected: untrusted sender`);
       }

@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, nativeTheme, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme, session, shell } from 'electron';
 
 import addonPath from '../../crates/tinydiff-napi/tinydiff.node?asset&asarUnpack';
 import type { NativeAddon } from '../../src/bindings/api';
@@ -106,7 +106,7 @@ async function start(native: NativeAddon, appMode: AppMode): Promise<void> {
   const rendererUrl = installRenderer();
   const settings = createSettings(join(app.getPath('userData'), 'settings.json'));
   nativeTheme.themeSource = settings.get('theme');
-  registerIpc(createHandlers(native, appMode, settings), rendererUrl);
+  registerIpc(ipcMain, createHandlers(native, appMode, settings), rendererUrl);
   await createWindow(rendererUrl).loadURL(rendererUrl);
 }
 
