@@ -7,7 +7,7 @@ import type { NativeAddon } from '../../src/bindings/api';
 import type { AppMode } from '../../src/bindings/types';
 import { getErrorMessage } from '../../src/core/command-error';
 import { loadAddon } from './addon';
-import { cliPaths } from './app-mode';
+import { parseCli, USAGE } from './app-mode';
 import { createHandlers, registerIpc } from './ipc';
 import { applyDevCsp, registerAppScheme, RENDERER_URL, serveRenderer } from './protocol';
 import { createSettings } from './settings';
@@ -138,10 +138,19 @@ function bootstrap(native: NativeAddon, appMode: AppMode): void {
 }
 
 function launch(): void {
+  const cli = parseCli(process.argv, process.defaultApp, process.env.OWD ?? process.cwd());
+  if (cli.kind === 'help') {
+    process.stdout.write(USAGE);
+    app.exit(0);
+    return;
+  }
+  if (cli.kind === 'version') {
+    process.stdout.write(`tinydiff ${app.getVersion()}\n`);
+    app.exit(0);
+    return;
+  }
   const native = loadAddon(addonPath);
-  const appMode = native.resolveAppMode(
-    cliPaths(process.argv, process.defaultApp, process.env.OWD ?? process.cwd())
-  );
+  const appMode = native.resolveAppMode(cli.paths);
   if (appMode.status === 'error') {
     log(getErrorMessage(appMode.error));
     app.exit(1);
