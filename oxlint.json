@@ -11,7 +11,9 @@
     "node_modules",
     "src/bindings/types.ts",
     "crates/tinydiff-napi/index.d.ts",
-    "src/vite-env.d.ts"
+    "src/vite-env.d.ts",
+    "dev/fixtures/file-contents/*-new.*",
+    "dev/fixtures/file-contents/*-old.*"
   ],
   "plugins": [
     "oxc",
@@ -91,6 +93,14 @@
     "vitest/prefer-todo": "error",
     "vitest/require-top-level-describe": "error"
   },
+  "overrides": [
+    {
+      "files": ["dev/fixtures/file-contents/index.ts"],
+      "rules": {
+        "import/default": "off"
+      }
+    }
+  ],
   "settings": {
     "react": {
       "version": "19"

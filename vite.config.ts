@@ -4,7 +4,6 @@ import { defineConfig } from 'vite';
 import { renderer } from './vite.renderer';
 
 const profilingEnabled = !!process.env.PROFILING_ENABLED;
-const isBrowserDev = !process.env.TAURI_ENV_PLATFORM;
 
 function devScripts(): Plugin {
   return {
@@ -16,15 +15,13 @@ function devScripts(): Plugin {
           return [];
         }
 
-        const scripts: HtmlTagDescriptor[] = [];
-
-        if (isBrowserDev) {
-          scripts.push({
+        const scripts: HtmlTagDescriptor[] = [
+          {
             tag: 'script',
             attrs: { type: 'module', src: '/dev/tinydiff-shim.ts' },
             injectTo: 'head'
-          });
-        }
+          }
+        ];
 
         if (profilingEnabled) {
           scripts.push({

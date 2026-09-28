@@ -28,6 +28,8 @@ function fail(context: string, error: unknown): void {
 
 function createWindow(rendererUrl: string): BrowserWindow {
   const win = new BrowserWindow({
+    name: 'main',
+    windowStatePersistence: true,
     width: 1024,
     height: 768,
     show: false,
