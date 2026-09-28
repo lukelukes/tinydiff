@@ -9,7 +9,7 @@ export default defineConfig({
         test: {
           ...e2e,
           name: 'e2e-package',
-          include: ['e2e/app.spec.ts'],
+          include: ['e2e/app.spec.ts', 'e2e/cli.spec.ts'],
           globalSetup: ['e2e/packaged-binary.ts']
         }
       },
