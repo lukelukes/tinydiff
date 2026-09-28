@@ -7,7 +7,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import type { Rectangle } from 'electron';
 import type { ElectronApplication, Page } from 'playwright';
 import { _electron as electron } from 'playwright';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 
 declare global {
   var openedExternally: string[] | undefined;
@@ -65,7 +65,7 @@ function createRepo(): string {
 }
 
 function launch(repoDir: string, userDataDir: string): Promise<ElectronApplication> {
-  const executablePath = process.env.TD_E2E_BINARY;
+  const executablePath = inject('packagedExecutable');
   const appArgs = [`--user-data-dir=${userDataDir}`, repoDir];
   return electron.launch({
     ...(executablePath ? { executablePath } : {}),

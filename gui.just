@@ -1,6 +1,8 @@
 set quiet
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
+e2e_runner := if env("DISPLAY", "") != "" { "" } else if env("WAYLAND_DISPLAY", "") != "" { "" } else { "xvfb-run -a" }
+
 [private]
 addon:
     just napi::build
@@ -25,4 +27,21 @@ browsers:
 
 [group('test')]
 e2e: build
-    if [[ -z "${DISPLAY:-}" && -z "${WAYLAND_DISPLAY:-}" ]]; then xvfb-run -a bun run test:e2e; else bun run test:e2e; fi
+    {{ e2e_runner }} bun run test:e2e
+
+[group('test')]
+e2e-package: package
+    {{ e2e_runner }} bun vitest run --config vitest.packaged.config.ts --project e2e-package
+
+[group('test')]
+smoke: package
+    bun vitest run --config vitest.packaged.config.ts --project packaged e2e/packaged-smoke.spec.ts
+
+[group('test')]
+deb-install: package
+    bun vitest run --config vitest.packaged.config.ts --project packaged e2e/packaged-install.spec.ts
+
+[group('dist')]
+package: build
+    bun run package
+    bun vitest run --config vitest.packaged.config.ts --project packaged e2e/packaged-artifacts.spec.ts

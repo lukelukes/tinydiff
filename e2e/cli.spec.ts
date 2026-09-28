@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, inject, it } from 'vitest';
 
 function electronBinary(): string {
   const binary: unknown = createRequire(import.meta.url)('electron');
@@ -27,10 +27,10 @@ function packageVersion(): string {
 }
 
 function runCli(args: string[]): { status: number | null; stdout: string } {
-  const packaged = process.env.TD_E2E_BINARY;
+  const executablePath = inject('packagedExecutable');
   const result = spawnSync(
-    packaged ?? electronBinary(),
-    packaged ? args : [resolve('.'), ...args],
+    executablePath ?? electronBinary(),
+    executablePath ? args : [resolve('.'), ...args],
     { encoding: 'utf8', timeout: 30_000 }
   );
   return { status: result.status, stdout: result.stdout };
