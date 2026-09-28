@@ -1,12 +1,9 @@
-import { isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { net, protocol, session } from 'electron';
 
 import { CSP, devCsp } from './csp';
-
-const SCHEME = 'app';
-const HOST = 'renderer';
+import { HOST, rendererFilePath, SCHEME } from './renderer-path';
 
 export const RENDERER_URL = `${SCHEME}://${HOST}/`;
 
@@ -22,10 +19,8 @@ export function registerAppScheme(): void {
 
 export function serveRenderer(root: string): void {
   protocol.handle(SCHEME, async (request) => {
-    const { host, pathname } = new URL(request.url);
-    const target = resolve(root, pathname === '/' ? 'index.html' : `.${pathname}`);
-    const rel = relative(root, target);
-    if (host !== HOST || rel === '' || rel.startsWith('..') || isAbsolute(rel)) {
+    const target = rendererFilePath(request.url, root);
+    if (target === null) {
       return notFound();
     }
     try {
