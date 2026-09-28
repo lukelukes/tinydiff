@@ -5,9 +5,9 @@ import { renderer } from './vite.renderer';
 
 const headed = process.env.HEADED === 'true';
 
-const packaged = 'e2e/packaged-*.spec.ts';
+export const packaged = 'e2e/packaged-*.spec.ts';
 
-const e2e = {
+export const e2e = {
   environment: 'node',
   testTimeout: 60000,
   hookTimeout: 120000
@@ -55,22 +55,6 @@ export default defineConfig({
           name: 'e2e',
           include: ['e2e/**/*.spec.ts'],
           exclude: [packaged]
-        }
-      },
-      {
-        test: {
-          ...e2e,
-          name: 'e2e-package',
-          include: ['e2e/app.spec.ts'],
-          globalSetup: ['e2e/packaged-binary.ts']
-        }
-      },
-      {
-        test: {
-          name: 'packaged',
-          environment: 'node',
-          include: [packaged],
-          testTimeout: 180000
         }
       }
     ]

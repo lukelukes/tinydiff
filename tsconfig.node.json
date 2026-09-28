@@ -8,5 +8,11 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["vite.config.ts", "vite.renderer.ts", "vitest.config.ts", "electron.vite.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "vite.renderer.ts",
+    "vitest.config.ts",
+    "vitest.packaged.config.ts",
+    "electron.vite.config.ts"
+  ]
 }

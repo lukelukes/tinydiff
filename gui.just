@@ -31,17 +31,17 @@ e2e: build
 
 [group('test')]
 e2e-package: package
-    {{ e2e_runner }} bun vitest run --project e2e-package
+    {{ e2e_runner }} bun vitest run --config vitest.packaged.config.ts --project e2e-package
 
 [group('test')]
 smoke: package
-    bun vitest run --project packaged e2e/packaged-smoke.spec.ts
+    bun vitest run --config vitest.packaged.config.ts --project packaged e2e/packaged-smoke.spec.ts
 
 [group('test')]
 deb-install: package
-    bun vitest run --project packaged e2e/packaged-install.spec.ts
+    bun vitest run --config vitest.packaged.config.ts --project packaged e2e/packaged-install.spec.ts
 
 [group('dist')]
 package: build
     bun run package
-    bun vitest run --project packaged e2e/packaged-artifacts.spec.ts
+    bun vitest run --config vitest.packaged.config.ts --project packaged e2e/packaged-artifacts.spec.ts

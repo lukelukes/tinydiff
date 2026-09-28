@@ -11,5 +11,8 @@
   "ignore": ["electron/main/assets.d.ts", "src/bindings/types.ts"],
   "ignoreBinaries": ["just"],
   "ignoreDependencies": ["@napi-rs/cli"],
-  "ignoreExportsUsedInFile": true
+  "ignoreExportsUsedInFile": true,
+  "vitest": {
+    "config": ["vitest.config.ts", "vitest.packaged.config.ts"]
+  }
 }
