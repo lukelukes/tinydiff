@@ -21,7 +21,7 @@ function devScripts(): Plugin {
         if (isBrowserDev) {
           scripts.push({
             tag: 'script',
-            attrs: { type: 'module', src: '/dev/tauri-mock.ts' },
+            attrs: { type: 'module', src: '/dev/tinydiff-shim.ts' },
             injectTo: 'head'
           });
         }

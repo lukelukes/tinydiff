@@ -3,6 +3,7 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 
 mod cargo 'crates/tinydiff-tauri/justfile'
 mod gpui 'crates/tinydiff-gpui/justfile'
+mod napi 'crates/tinydiff-napi/justfile'
 mod gui
 
 [default]

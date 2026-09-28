@@ -1,11 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import {
-  commands,
-  type CommandError,
-  type DiffTarget,
-  type GitFileContents
-} from '../../../tauri-bindings';
+import type { CommandError, DiffTarget, GitFileContents } from '#bindings/index';
 
 export type GitFileContentsState =
   | { status: 'idle' }
@@ -27,7 +22,7 @@ export function useGitFileContents(
         return;
       }
       if (canApply()) setState({ status: 'loading' });
-      const result = await commands.getGitFileContents(repoPath, filePath, target);
+      const result = await window.tinydiff.getGitFileContents(repoPath, filePath, target);
       if (!canApply()) return;
       setState(
         result.status === 'ok'

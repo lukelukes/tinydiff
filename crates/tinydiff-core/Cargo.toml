@@ -11,6 +11,7 @@ workspace = true
 [features]
 default = []
 specta = ["dep:specta"]
+vendored = ["git2/vendored-libgit2", "git2/vendored-openssl"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -22,5 +23,10 @@ fs2 = "0.4"
 specta = { version = "=2.0.0-rc.22", features = ["derive"], optional = true }
 
 [dev-dependencies]
+specta-typescript = "0.0.9"
 tempfile = "3.26"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[[example]]
+name = "export-types"
+required-features = ["specta"]

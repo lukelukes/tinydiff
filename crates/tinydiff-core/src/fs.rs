@@ -1,7 +1,20 @@
 use crate::error::CoreError;
 use crate::types::ReadFileResult;
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Component, Path};
+
+pub fn validate_relative_path(file_path: &str) -> Result<(), CoreError> {
+    let relative = Path::new(file_path)
+        .components()
+        .all(|component| matches!(component, Component::Normal(_) | Component::CurDir));
+    if relative {
+        Ok(())
+    } else {
+        Err(CoreError::InvalidPath(format!(
+            "{file_path} must be a relative path inside the repository"
+        )))
+    }
+}
 
 pub fn extension_to_lang(path: &str) -> Option<String> {
     let file_path = Path::new(path);

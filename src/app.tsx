@@ -12,6 +12,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { WorkerPoolContextProvider } from '@pierre/diffs/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
+import type { Comment, DiffTarget } from '#bindings/index';
 import type { AppMode } from '#core/app-mode';
 import { getErrorMessage } from '#core/command-error';
 import {
@@ -39,9 +40,6 @@ import {
   type SelectedLineRange
 } from '#features/diff-viewer';
 import { FileTree, useGitStatus } from '#features/file-tree';
-import { settingsStore } from '#lib/settings-store';
-
-import type { Comment, DiffTarget } from '../tauri-bindings';
 
 import './app.css';
 
@@ -49,13 +47,11 @@ function useTheme() {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   useEffect(() => {
-    void settingsStore.get<'dark' | 'light'>('theme').then((value) => {
-      if (value) {
-        const dark = value === 'dark';
-        setIsDark(dark);
-        document.documentElement.classList.toggle('dark', dark);
-        localStorage.setItem('tinydiff-theme', value);
-      }
+    void window.tinydiff.settingsGet('theme').then((value) => {
+      const dark = value === 'dark';
+      setIsDark(dark);
+      document.documentElement.classList.toggle('dark', dark);
+      localStorage.setItem('tinydiff-theme', value);
       return;
     });
   }, []);
@@ -65,7 +61,7 @@ function useTheme() {
     const theme = next ? 'dark' : 'light';
     document.documentElement.classList.toggle('dark', next);
     localStorage.setItem('tinydiff-theme', theme);
-    void settingsStore.set('theme', theme);
+    void window.tinydiff.settingsSet('theme', theme);
     setIsDark(next);
   }, [isDark]);
 

@@ -1,4 +1,5 @@
 use crate::error::CoreError;
+use crate::fs::validate_relative_path;
 use crate::types::{Comment, CommentAnchor, CommentCollection};
 use fs2::FileExt;
 use std::fs::{self, File};
@@ -6,15 +7,6 @@ use std::path::Path;
 
 fn comments_file_path(repo_path: &Path) -> std::path::PathBuf {
     repo_path.join(".tinydiff").join("comments.json")
-}
-
-fn validate_file_path(file_path: &str) -> Result<(), CoreError> {
-    if file_path.contains("..") || Path::new(file_path).is_absolute() {
-        return Err(CoreError::InvalidPath(
-            "Invalid file path: must be relative and cannot contain '..'".to_owned(),
-        ));
-    }
-    Ok(())
 }
 
 fn build_context_window(lines: &[&str], line_idx: usize) -> String {
@@ -73,7 +65,7 @@ pub fn save_comment(
     mut comment: Comment,
     file_contents: Option<&str>,
 ) -> Result<(), CoreError> {
-    validate_file_path(&comment.file_path)?;
+    validate_relative_path(&comment.file_path)?;
 
     let line = comment.anchor.line();
     if let Some(contents) = file_contents
@@ -167,7 +159,7 @@ pub fn get_comments_for_file(
     file_path: &str,
     file_contents: &str,
 ) -> Result<Vec<Comment>, CoreError> {
-    validate_file_path(file_path)?;
+    validate_relative_path(file_path)?;
     let collection = load_comments(repo_path)?;
     let mut result: Vec<Comment> = collection
         .comments

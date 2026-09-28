@@ -40,6 +40,15 @@ export default defineConfig({
           environment: 'node',
           include: ['src/**/*.browser.{test,spec}.{ts,tsx}']
         }
+      },
+      {
+        test: {
+          name: 'e2e',
+          environment: 'node',
+          include: ['e2e/**/*.spec.ts'],
+          testTimeout: 60000,
+          hookTimeout: 120000
+        }
       }
     ]
   }

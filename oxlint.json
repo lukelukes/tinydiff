@@ -6,7 +6,13 @@
     "perf": "error",
     "suspicious": "error"
   },
-  "ignorePatterns": ["dist", "node_modules", "tauri-bindings", "src/vite-env.d.ts"],
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "src/bindings/types.ts",
+    "crates/tinydiff-napi/index.d.ts",
+    "src/vite-env.d.ts"
+  ],
   "plugins": [
     "oxc",
     "typescript",

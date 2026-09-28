@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render } from 'vitest-browser-react';
 
-import type { DiffFile } from '../../../tauri-bindings';
+import type { DiffFile } from '#bindings/index';
+
 import { DiffViewer } from './diff-viewer';
 import type { GitFileContentsState } from './use-git-file-contents';
 
@@ -9,7 +10,7 @@ const loading: GitFileContentsState = { status: 'loading' };
 const idle: GitFileContentsState = { status: 'idle' };
 
 function errorState(message: string): GitFileContentsState {
-  return { status: 'error', error: { type: 'git', path: '', message } };
+  return { status: 'error', error: { type: 'git', message } };
 }
 
 function successState(oldFile: DiffFile, newFile: DiffFile): GitFileContentsState {

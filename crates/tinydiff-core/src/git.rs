@@ -1,5 +1,5 @@
 use crate::error::CoreError;
-use crate::fs::extension_to_lang;
+use crate::fs::{extension_to_lang, validate_relative_path};
 use crate::types::{
     DiffContent, DiffFile, DiffHunk, DiffLine, DiffTarget, FileContent, FileDiff, FileEntry,
     FileEntryKind, GitFileContents, GitStatus, LineChangeType,
@@ -190,6 +190,7 @@ pub fn get_file_diff(
     file_path: &str,
     target: DiffTarget,
 ) -> Result<FileDiff, CoreError> {
+    validate_relative_path(file_path)?;
     let repo = discover_repository(repo_path)?;
     get_file_diff_with_repo(&repo, file_path, target)
 }
@@ -311,12 +312,7 @@ fn get_git_file_contents_with_repo(
     file_path: &str,
     target: DiffTarget,
 ) -> Result<GitFileContents, CoreError> {
-    let file_path_obj = Path::new(file_path);
-    if file_path_obj.is_absolute() {
-        return Err(CoreError::InvalidPath(
-            "Absolute paths are not allowed".to_owned(),
-        ));
-    }
+    validate_relative_path(file_path)?;
 
     if target == DiffTarget::Unstaged {
         let workdir = repo

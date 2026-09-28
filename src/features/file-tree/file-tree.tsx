@@ -7,6 +7,7 @@ import {
 import { HugeiconsIcon } from '@hugeicons/react';
 import { useRef } from 'react';
 
+import type { GitStatus, DiffTarget } from '#bindings/index';
 import {
   Collapsible,
   CollapsibleContent,
@@ -20,7 +21,6 @@ import {
 } from '#features/components/ui/sidebar';
 import { sidebarMenuButtonVariants } from '#features/components/ui/sidebar-menu-button-variants';
 
-import type { GitStatus, DiffTarget } from '../../../tauri-bindings';
 import { buildFileTree, getStatusLabel, type FileTreeNode } from './tree-builder';
 import { useFileTreeKeyboard } from './use-file-tree-keyboard';
 

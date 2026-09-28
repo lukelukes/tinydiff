@@ -1,8 +1,16 @@
 import { join } from 'node:path';
 
-import { app, BrowserWindow, session, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme, session, shell } from 'electron';
 
+import addonPath from '../../crates/tinydiff-napi/tinydiff.node?asset&asarUnpack';
+import type { NativeAddon } from '../../src/bindings/api';
+import type { AppMode } from '../../src/bindings/types';
+import { getErrorMessage } from '../../src/core/command-error';
+import { loadAddon } from './addon';
+import { parseCli, USAGE } from './app-mode';
+import { createHandlers, registerIpc } from './ipc';
 import { applyDevCsp, registerAppScheme, RENDERER_URL, serveRenderer } from './protocol';
+import { createSettings } from './settings';
 import { devRenderer, httpUrl, withinRenderer } from './urls';
 
 function log(message: string): void {
@@ -26,6 +34,7 @@ function createWindow(rendererUrl: string): BrowserWindow {
     title: 'TinyDiff',
     backgroundColor: '#18181b',
     webPreferences: {
+      preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true
@@ -86,7 +95,7 @@ function installRenderer(): string {
   return dev.url;
 }
 
-async function start(): Promise<void> {
+async function start(native: NativeAddon, appMode: AppMode): Promise<void> {
   await app.whenReady();
 
   session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => {
@@ -95,10 +104,13 @@ async function start(): Promise<void> {
   session.defaultSession.setPermissionCheckHandler(() => false);
 
   const rendererUrl = installRenderer();
+  const settings = createSettings(join(app.getPath('userData'), 'settings.json'));
+  nativeTheme.themeSource = settings.get('theme');
+  registerIpc(ipcMain, createHandlers(native, appMode, settings), rendererUrl);
   await createWindow(rendererUrl).loadURL(rendererUrl);
 }
 
-function bootstrap(): void {
+function bootstrap(native: NativeAddon, appMode: AppMode): void {
   registerAppScheme();
 
   app.on('second-instance', (_event, argv, workingDirectory) => {
@@ -120,15 +132,39 @@ function bootstrap(): void {
     app.quit();
   });
 
-  start().catch((error: unknown) => {
+  start(native, appMode).catch((error: unknown) => {
     fail('startup failed', error);
   });
 }
 
+function launch(): void {
+  const cli = parseCli(process.argv, process.defaultApp, process.env.OWD ?? process.cwd());
+  if (cli.kind === 'help') {
+    process.stdout.write(USAGE);
+    app.exit(0);
+    return;
+  }
+  if (cli.kind === 'version') {
+    process.stdout.write(`tinydiff ${app.getVersion()}\n`);
+    app.exit(0);
+    return;
+  }
+  const native = loadAddon(addonPath);
+  const appMode = native.resolveAppMode(cli.paths);
+  if (appMode.status === 'error') {
+    log(getErrorMessage(appMode.error));
+    app.exit(1);
+  } else if (app.requestSingleInstanceLock()) {
+    bootstrap(native, appMode.data);
+  } else {
+    app.exit(0);
+  }
+}
+
 app.setName('tinydiff');
 
-if (app.requestSingleInstanceLock()) {
-  bootstrap();
-} else {
-  app.exit(0);
+try {
+  launch();
+} catch (error) {
+  fail('startup failed', error);
 }

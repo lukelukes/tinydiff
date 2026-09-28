@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/tinydiff-tauri", "crates/tinydiff-core", "crates/tinydiff-gpui"]
+members = [
+  "crates/tinydiff-tauri",
+  "crates/tinydiff-core",
+  "crates/tinydiff-gpui",
+  "crates/tinydiff-napi",
+]
 
 [workspace.lints.rust]
 unsafe_code = "warn"
